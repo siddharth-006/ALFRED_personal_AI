@@ -2,11 +2,16 @@
   "name": "alfred",
   "version": "0.1.0",
   "private": true,
+  "description": "ALFRED Desktop Application",
+  "author": "ALFRED",
+  "main": "dist-electron/main/index.js",
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "next build --turbopack",
-    "start": "next start",
-    "lint": "eslint"
+    "compile:electron": "tsc -p tsconfig.electron.json",
+    "electron": "tsc -p tsconfig.electron.json && electron .",
+    "desktop": "concurrently \"npm run dev\" \"wait-on http://localhost:3000 && npm run electron\"",
+    "build": "next build && npm run compile:electron",
+    "dist": "npm run build && electron-builder"
   },
   "dependencies": {
     "@types/howler": "^2.2.13",
@@ -23,9 +28,35 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "concurrently": "^10.0.4",
+    "cross-env": "^10.1.0",
+    "electron": "^43.2.0",
+    "electron-builder": "^26.15.3",
     "eslint": "^9",
     "eslint-config-next": "15.5.19",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "ts-node": "^10.9.2",
+    "tsx": "^4.23.1",
+    "typescript": "^5",
+    "wait-on": "^9.1.0"
+  },
+  "build": {
+    "appId": "com.alfred.app",
+    "productName": "ALFRED",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist-electron/**/*",
+      "out/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "public/favicon.ico"
+    }
   }
 }
