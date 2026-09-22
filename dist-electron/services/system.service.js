@@ -12,7 +12,7 @@ class SystemService {
             platform: process.platform,
             arch: process.arch,
             osRelease: os_1.default.release(),
-            appVersion: electron_1.app.getVersion(),
+            appVersion: electron_1.app?.getVersion ? electron_1.app.getVersion() : "1.0.0",
             electronVersion: process.versions.electron || "",
             nodeVersion: process.versions.node || "",
             cpus: os_1.default.cpus().length,

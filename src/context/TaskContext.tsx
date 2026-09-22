@@ -59,8 +59,23 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isLoaded) {
       localStorage.setItem('alfred_tasks_v2', JSON.stringify(tasks));
+      if (typeof window !== "undefined" && window.electron?.tasks?.syncTasks) {
+        window.electron.tasks.syncTasks(tasks);
+      }
     }
   }, [tasks, isLoaded]);
+
+  // Real-time synchronization when tasks are mutated in Electron (via AI Command Agent)
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.electron?.tasks?.onTasksChanged) {
+      const unsubscribe = window.electron.tasks.onTasksChanged((updatedTasks: Task[]) => {
+        if (Array.isArray(updatedTasks)) {
+          setTasks(updatedTasks);
+        }
+      });
+      return () => unsubscribe();
+    }
+  }, []);
 
   const addTask = (text: string, category: TaskCategory) => {
     const newTask: Task = {

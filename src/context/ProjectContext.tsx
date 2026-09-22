@@ -71,8 +71,23 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isLoaded) {
       localStorage.setItem("alfred_projects", JSON.stringify(projects));
+      if (typeof window !== "undefined" && window.electron?.projects?.syncProjects) {
+        window.electron.projects.syncProjects(projects);
+      }
     }
   }, [projects, isLoaded]);
+
+  // Real-time synchronization when projects are mutated in Electron (via AI Command Agent)
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.electron?.projects?.onProjectsChanged) {
+      const unsubscribe = window.electron.projects.onProjectsChanged((updatedProjects: Project[]) => {
+        if (Array.isArray(updatedProjects)) {
+          setProjects(updatedProjects);
+        }
+      });
+      return () => unsubscribe();
+    }
+  }, []);
 
   const addProject = (projectData: Omit<Project, "id">) => {
     const newProject: Project = {

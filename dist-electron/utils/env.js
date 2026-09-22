@@ -8,8 +8,8 @@ exports.getPreloadPath = getPreloadPath;
 exports.getProductionHtmlPath = getProductionHtmlPath;
 const electron_1 = require("electron");
 const path_1 = __importDefault(require("path"));
-exports.isDev = !electron_1.app.isPackaged;
-exports.isPackaged = electron_1.app.isPackaged;
+exports.isDev = typeof electron_1.app !== "undefined" && electron_1.app ? !electron_1.app.isPackaged : process.env.NODE_ENV !== "production";
+exports.isPackaged = typeof electron_1.app !== "undefined" && electron_1.app ? Boolean(electron_1.app.isPackaged) : false;
 /**
  * Resolves path to compiled preload script
  */

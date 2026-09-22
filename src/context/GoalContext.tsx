@@ -45,8 +45,23 @@ export function GoalProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isLoaded) {
       localStorage.setItem("alfred_goals", JSON.stringify(goals));
+      if (typeof window !== "undefined" && window.electron?.goals?.syncGoals) {
+        window.electron.goals.syncGoals(goals);
+      }
     }
   }, [goals, isLoaded]);
+
+  // Real-time synchronization when goals are mutated in Electron (via AI Command Agent)
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.electron?.goals?.onGoalsChanged) {
+      const unsubscribe = window.electron.goals.onGoalsChanged((updatedGoals: Goal[]) => {
+        if (Array.isArray(updatedGoals)) {
+          setGoals(updatedGoals);
+        }
+      });
+      return () => unsubscribe();
+    }
+  }, []);
 
   const addGoal = (title: string, type: GoalType, target: number) => {
     const newGoal: Goal = {

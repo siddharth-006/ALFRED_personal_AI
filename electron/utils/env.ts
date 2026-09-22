@@ -1,8 +1,8 @@
 import { app } from "electron";
 import path from "path";
 
-export const isDev = !app.isPackaged;
-export const isPackaged = app.isPackaged;
+export const isDev = typeof app !== "undefined" && app ? !app.isPackaged : process.env.NODE_ENV !== "production";
+export const isPackaged = typeof app !== "undefined" && app ? Boolean(app.isPackaged) : false;
 
 /**
  * Resolves path to compiled preload script

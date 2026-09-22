@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { Activity, Wifi, ShieldAlert, Zap } from "lucide-react";
+import AIProviderSelector from "./AIProviderSelector";
 
 export default function TopCommandBar() {
   const [time, setTime] = useState("");
@@ -31,12 +32,13 @@ export default function TopCommandBar() {
         </div>
       </div>
 
-      <div className="flex items-center space-x-6">
-        <div className="flex items-center space-x-2 px-3 py-1 bg-[#00E5FF]/10 border border-[#00E5FF]/30">
+      <div className="flex items-center space-x-4">
+        <AIProviderSelector />
+        <div className="flex items-center space-x-2 px-3 py-1 bg-[#00E5FF]/10 border border-[#00E5FF]/30 hidden sm:flex">
           <div className="w-2 h-2 rounded-full bg-[#00E5FF] animate-ping" />
           <span className="font-data text-xs text-[#00E5FF] font-bold text-glow">AI CORE ONLINE</span>
         </div>
-        <div className="text-right hidden sm:block">
+        <div className="text-right hidden md:block">
           <div className="font-data text-sm text-[#DFF6FF]">{time}</div>
           <div className="font-data text-[10px] text-[#A8C7FA]">{date}</div>
         </div>

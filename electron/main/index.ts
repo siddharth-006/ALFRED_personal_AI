@@ -1,6 +1,8 @@
 import { app, BrowserWindow } from "electron";
 import { createMainWindow, getMainWindow } from "../windows/main-window";
 import { registerAllIpcHandlers } from "../ipc";
+import { registerDefaultProviders } from "../agent/providers";
+import { registerDefaultTools } from "../agent/tools";
 import { logger } from "../utils/logger";
 
 logger.info("Initializing ALFRED Electron Main Process...");
@@ -21,6 +23,10 @@ if (!gotTheLock) {
 
     app.whenReady().then(async () => {
         logger.info("Electron app fully ready.");
+
+        // Register default tools and AI providers
+        registerDefaultTools();
+        registerDefaultProviders();
 
         // Register IPC modules
         registerAllIpcHandlers();

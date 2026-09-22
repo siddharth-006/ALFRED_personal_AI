@@ -19,7 +19,7 @@ export class SystemService {
             platform: process.platform,
             arch: process.arch,
             osRelease: os.release(),
-            appVersion: app.getVersion(),
+            appVersion: app?.getVersion ? app.getVersion() : "1.0.0",
             electronVersion: process.versions.electron || "",
             nodeVersion: process.versions.node || "",
             cpus: os.cpus().length,

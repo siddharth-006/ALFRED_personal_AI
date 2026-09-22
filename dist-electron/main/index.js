@@ -3,6 +3,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const electron_1 = require("electron");
 const main_window_1 = require("../windows/main-window");
 const ipc_1 = require("../ipc");
+const providers_1 = require("../agent/providers");
+const tools_1 = require("../agent/tools");
 const logger_1 = require("../utils/logger");
 logger_1.logger.info("Initializing ALFRED Electron Main Process...");
 // Single Instance Lock
@@ -22,6 +24,9 @@ else {
     });
     electron_1.app.whenReady().then(async () => {
         logger_1.logger.info("Electron app fully ready.");
+        // Register default tools and AI providers
+        (0, tools_1.registerDefaultTools)();
+        (0, providers_1.registerDefaultProviders)();
         // Register IPC modules
         (0, ipc_1.registerAllIpcHandlers)();
         // Create main application window

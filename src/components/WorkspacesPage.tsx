@@ -135,12 +135,35 @@ export default function WorkspacesPage() {
     setIsLaunchModalOpen(true);
   };
 
-  const executeLaunch = () => {
+  const executeLaunch = async () => {
     if (!activeWorkspace) return;
     
     launchWorkspace(activeWorkspace.id);
+
+    if (typeof window !== "undefined" && window.electron?.workspace) {
+      try {
+        const result = await window.electron.workspace.launch(activeWorkspace);
+        if (result.success) {
+          setLaunchMessage("Workspace launched successfully!");
+        } else {
+          const failedItems = result.results.filter(r => !r.success);
+          if (failedItems.length > 0) {
+            setLaunchMessage(`Workspace launched with warnings: ${failedItems.map(f => `${f.target} (${f.error})`).join(", ")}`);
+          } else {
+            setLaunchMessage("Workspace launched successfully!");
+          }
+        }
+      } catch (err: unknown) {
+        setLaunchMessage("Error launching workspace via desktop service.");
+      }
+      setTimeout(() => {
+        setIsLaunchModalOpen(false);
+        setActiveWorkspace(null);
+      }, 2500);
+      return;
+    }
     
-    // Open websites
+    // Open websites (fallback for standalone browser mode)
     let openedCount = 0;
     activeWorkspace.websites.forEach(url => {
       const newWin = window.open(url, "_blank");
@@ -362,7 +385,7 @@ export default function WorkspacesPage() {
             
             <div className="p-6 max-h-[50vh] overflow-y-auto space-y-6">
               <div className="bg-blue-500/10 border border-blue-500/20 text-blue-200 text-sm p-4 rounded-lg">
-                <strong>Note:</strong> Desktop applications and local folders cannot be launched automatically from a standard web browser. They are displayed below for your reference to open manually. Websites will be opened automatically.
+                <strong>Note:</strong> Applications, websites, and local folders in this workspace will be launched automatically via ALFRED desktop service.
               </div>
 
               {activeWorkspace.applications.length > 0 && (
