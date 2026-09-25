@@ -1,7 +1,8 @@
-import { spawn, execFile } from "child_process";
+import { spawn } from "child_process";
 import fs from "fs";
 import path from "path";
 import { logger } from "../utils/logger";
+import { APP_DISPLAY_NAMES } from "./app-resolver.tool";
 
 export interface AppExecutionOptions {
     isMock?: boolean;
@@ -16,12 +17,29 @@ export interface AppExecutionResult {
 }
 
 /**
+ * Safely checks if a file exists on Windows.
+ * Handles both standard files and Windows Store App Execution Alias reparse points
+ * (which may throw EACCES on statSync but succeed on lstatSync).
+ */
+function fileExists(filePath: string): boolean {
+    if (!filePath || typeof filePath !== "string") return false;
+    try {
+        if (fs.existsSync(filePath)) return true;
+        const stat = fs.lstatSync(filePath);
+        return Boolean(stat);
+    } catch {
+        return false;
+    }
+}
+
+/**
  * Known Windows installation paths for whitelisted executable keys.
- * Constructed dynamically using system environment variables (%LOCALAPPDATA%, %PROGRAMFILES%, etc.).
+ * Constructed dynamically using system environment variables (%LOCALAPPDATA%, %PROGRAMFILES%, %APPDATA%, etc.).
  * No user-specific paths or hardcoded machine usernames are used.
  */
 function getCandidateExecutablePaths(key: string): string[] {
     const localAppData = process.env.LOCALAPPDATA || "";
+    const appData = process.env.APPDATA || "";
     const programFiles = process.env.PROGRAMFILES || "";
     const programFilesX86 = process.env["PROGRAMFILES(X86)"] || "";
 
@@ -32,43 +50,113 @@ function getCandidateExecutablePaths(key: string): string[] {
                 path.join(programFiles, "Microsoft VS Code", "Code.exe"),
                 path.join(programFilesX86, "Microsoft VS Code", "Code.exe"),
             ];
+
         case "chrome":
             return [
                 path.join(programFiles, "Google", "Chrome", "Application", "chrome.exe"),
                 path.join(programFilesX86, "Google", "Chrome", "Application", "chrome.exe"),
                 path.join(localAppData, "Google", "Chrome", "Application", "chrome.exe"),
             ];
+
         case "wt":
             return [
                 path.join(localAppData, "Microsoft", "WindowsApps", "wt.exe"),
             ];
+
         case "pbidesktop":
             return [
                 path.join(programFiles, "Microsoft Power BI Desktop", "bin", "PBIDesktop.exe"),
                 path.join(programFilesX86, "Microsoft Power BI Desktop", "bin", "PBIDesktop.exe"),
             ];
+
         case "spotify":
             return [
+                path.join(appData, "Spotify", "Spotify.exe"),
                 path.join(localAppData, "Spotify", "Spotify.exe"),
+                path.join(localAppData, "Microsoft", "WindowsApps", "Spotify.exe"),
                 path.join(programFiles, "Spotify", "Spotify.exe"),
+                path.join(programFilesX86, "Spotify", "Spotify.exe"),
             ];
+
+        case "discord": {
+            const paths: string[] = [];
+            const discordDir = path.join(localAppData, "Discord");
+            if (fileExists(discordDir)) {
+                try {
+                    const entries = fs.readdirSync(discordDir, { withFileTypes: true });
+                    const appDirs = entries
+                        .filter((d) => d.isDirectory() && d.name.startsWith("app-"))
+                        .map((d) => d.name)
+                        .sort((a, b) => b.localeCompare(a, undefined, { numeric: true, sensitivity: "base" }));
+
+                    for (const appDir of appDirs) {
+                        paths.push(path.join(discordDir, appDir, "Discord.exe"));
+                    }
+                } catch {
+                    // Ignore directory read failure
+                }
+            }
+            paths.push(path.join(discordDir, "Discord.exe"));
+            paths.push(path.join(programFiles, "Discord", "Discord.exe"));
+            paths.push(path.join(programFilesX86, "Discord", "Discord.exe"));
+            return paths;
+        }
+
         default:
             return [];
     }
 }
 
 /**
- * Safe Application Execution Tool for ALFRED (Phase 3.2 - Step 3 Debugged)
+ * Searches the Windows PATH environment directories safely without invoking any shell.
+ * Only searches for exact, verified filenames associated with the whitelisted executable.
+ */
+function findOnPath(executableKey: string): string | null {
+    const filenameMap: Record<string, string[]> = {
+        code: ["Code.exe"],
+        chrome: ["chrome.exe"],
+        wt: ["wt.exe"],
+        spotify: ["Spotify.exe"],
+        discord: ["Discord.exe"],
+        pbidesktop: ["PBIDesktop.exe"],
+    };
+
+    const filenames = filenameMap[executableKey.toLowerCase()] || [];
+    if (filenames.length === 0) return null;
+
+    const pathEnv = process.env.PATH || "";
+    const directories = pathEnv.split(path.delimiter);
+
+    for (const dir of directories) {
+        if (!dir || !dir.trim()) continue;
+        for (const filename of filenames) {
+            try {
+                const candidate = path.join(dir.trim(), filename);
+                if (fileExists(candidate)) {
+                    return candidate;
+                }
+            } catch {
+                // Ignore invalid or inaccessible paths
+            }
+        }
+    }
+
+    return null;
+}
+
+/**
+ * Safe Application Execution Tool for ALFRED (Phase 5.1 - Native Desktop Application Control)
  *
  * Strictly executes pre-whitelisted application executables passed from AppResolverTool.
- * Dynamically resolves installation paths on Windows without relying on %PATH%.
- * NEVER accepts unvalidated user prompts or raw shell command strings.
+ * Dynamically resolves installation paths on Windows without arbitrary execution or shell invocation.
+ * NEVER accepts unvalidated user prompts, raw shell strings, or unwhitelisted binaries.
+ * NEVER falls back to cmd.exe, PowerShell, or shell execution.
  */
 export class AppExecutorTool {
     /**
      * Spawns a whitelisted application executable safely as a detached process.
      *
-     * @param executable Whitelisted executable key (e.g. "code", "chrome", "wt")
+     * @param executable Whitelisted executable key (e.g. "code", "chrome", "wt", "discord", "spotify")
      * @param options Execution options (supports mock execution for unit tests)
      */
     public async execute(
@@ -88,20 +176,36 @@ export class AppExecutorTool {
 
         // 1. Check known dynamic Windows installation paths for the whitelisted executable key
         const candidatePaths = getCandidateExecutablePaths(executable);
-        const resolvedPath = candidatePaths.find((p) => fs.existsSync(p));
+        const resolvedPath = candidatePaths.find((p) => fileExists(p));
 
         if (resolvedPath) {
             logger.info(`AppExecutorTool: Found verified application binary at '${resolvedPath}'`);
             return this.spawnBinary(resolvedPath, executable);
         }
 
-        // 2. Fallback: Try launching via Windows Shell 'start' command for App Execution Aliases / PATH
-        logger.info(
-            `AppExecutorTool: Binary not found in standard paths for '${executable}'. Trying Windows Shell start fallback...`
+        // 2. Safe PATH inspection (no shell execution)
+        const pathBinary = findOnPath(executable);
+        if (pathBinary) {
+            logger.info(`AppExecutorTool: Found verified application binary on PATH at '${pathBinary}'`);
+            return this.spawnBinary(pathBinary, executable);
+        }
+
+        // 3. Application not installed on this system — return clean error without shell fallback
+        const displayName = APP_DISPLAY_NAMES[executable] || executable;
+        logger.warn(
+            `AppExecutorTool: Binary not found on system for '${executable}'. Returning safe not-found error.`
         );
-        return this.launchViaWindowsStart(executable);
+        return {
+            success: false,
+            executable,
+            executed: false,
+            error: `${displayName} could not be found on this system.`,
+        };
     }
 
+    /**
+     * Spawns verified native binary directly with shell: false.
+     */
     private spawnBinary(binaryPath: string, originalExecutableKey: string): Promise<AppExecutionResult> {
         return new Promise((resolve) => {
             try {
@@ -148,31 +252,6 @@ export class AppExecutorTool {
                     error: message,
                 });
             }
-        });
-    }
-
-    private launchViaWindowsStart(executableKey: string): Promise<AppExecutionResult> {
-        return new Promise((resolve) => {
-            // Use execFile with cmd.exe /c start "" "<whitelisted_executable_key>"
-            // Note: Only the pre-whitelisted key is passed, NEVER raw user prompt
-            execFile("cmd.exe", ["/c", "start", "", executableKey], (error) => {
-                if (error) {
-                    logger.error(`AppExecutorTool: Windows start failed for '${executableKey}': ${error.message}`);
-                    resolve({
-                        success: false,
-                        executable: executableKey,
-                        executed: false,
-                        error: `Application '${executableKey}' is not installed or could not be found on this system.`,
-                    });
-                } else {
-                    logger.info(`AppExecutorTool: Successfully launched '${executableKey}' via Windows start.`);
-                    resolve({
-                        success: true,
-                        executable: executableKey,
-                        executed: true,
-                    });
-                }
-            });
         });
     }
 }

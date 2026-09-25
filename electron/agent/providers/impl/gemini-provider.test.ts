@@ -41,11 +41,15 @@ async function runGeminiTests() {
         }
     }
 
-    providerConfigService.reset();
-    providerRegistry.clear();
-    providerRegistry.registerProvider(mockAIProvider);
-    providerRegistry.registerProvider(ollamaAIProvider);
-    providerRegistry.registerProvider(geminiAIProvider);
+    const savedKey = process.env.GEMINI_API_KEY;
+    delete process.env.GEMINI_API_KEY;
+
+    try {
+        providerConfigService.reset();
+        providerRegistry.clear();
+        providerRegistry.registerProvider(mockAIProvider);
+        providerRegistry.registerProvider(ollamaAIProvider);
+        providerRegistry.registerProvider(geminiAIProvider);
 
     // ===========================================================================
     // SECTION A: GeminiResponseParser
@@ -290,6 +294,12 @@ async function runGeminiTests() {
     console.log(`Gemini Provider Test Results: ${passed} PASSED, ${failed} FAILED (Total: ${passed + failed})`);
     console.log("==========================================================================");
     console.log("ℹ️  Real Gemini API key NOT required for any of these tests.\n");
+
+    } finally {
+        if (savedKey !== undefined) {
+            process.env.GEMINI_API_KEY = savedKey;
+        }
+    }
 
     if (failed > 0) {
         process.exit(1);

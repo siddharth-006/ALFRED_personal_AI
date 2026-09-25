@@ -24,11 +24,16 @@ class SystemService {
         if (!url.startsWith("http://") && !url.startsWith("https://")) {
             throw new Error("Invalid protocol for external URL.");
         }
-        await electron_1.shell.openExternal(url);
+        if (electron_1.shell && typeof electron_1.shell.openExternal === "function") {
+            await electron_1.shell.openExternal(url);
+        }
         return true;
     }
     async openPath(targetPath) {
-        return await electron_1.shell.openPath(targetPath);
+        if (electron_1.shell && typeof electron_1.shell.openPath === "function") {
+            return await electron_1.shell.openPath(targetPath);
+        }
+        return "";
     }
     sendNotification(title, body) {
         if (electron_1.Notification.isSupported()) {

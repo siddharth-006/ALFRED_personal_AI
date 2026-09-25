@@ -413,6 +413,8 @@ async function runAgentConfirmationRiskControlTests() {
     );
 
     // 20. Existing provider fallback behavior remains intact
+    const originalEnvKey = process.env.GEMINI_API_KEY;
+    delete process.env.GEMINI_API_KEY;
     providerConfigService.setActiveProviderId("gemini");
     const fallbackCommand = await commandAgentService.executeCommand("Open VS Code", { isMock: true });
     assert(
@@ -421,6 +423,9 @@ async function runAgentConfirmationRiskControlTests() {
         "20. Provider fallback behavior remains fully intact when active provider is unconfigured",
         `providerId: ${fallbackCommand.providerId}, fallbackUsed: ${fallbackCommand.fallbackUsed}`
     );
+    if (originalEnvKey) {
+        process.env.GEMINI_API_KEY = originalEnvKey;
+    }
 
     // =========================================================================
     // SECTION 4: RUNTIME PATH INTEGRATION VERIFICATION (Phase 4.16 Bug Fix)

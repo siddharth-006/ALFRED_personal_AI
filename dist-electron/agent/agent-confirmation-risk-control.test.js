@@ -254,10 +254,15 @@ async function runAgentConfirmationRiskControlTests() {
         turnsAfterConfirm[0].toolsExecuted?.includes("create_task") &&
         turnsAfterConfirm[0].toolsExecuted?.includes("create_goal"), "19c. Confirmed plan successfully records executed mutations into conversation context", `turnCount: ${turnsAfterConfirm.length}, tools: ${turnsAfterConfirm[0].toolsExecuted?.join(", ")}`);
     // 20. Existing provider fallback behavior remains intact
+    const originalEnvKey = process.env.GEMINI_API_KEY;
+    delete process.env.GEMINI_API_KEY;
     provider_config_service_1.providerConfigService.setActiveProviderId("gemini");
     const fallbackCommand = await command_agent_service_1.commandAgentService.executeCommand("Open VS Code", { isMock: true });
     assert(fallbackCommand.success === true &&
         fallbackCommand.fallbackUsed === true, "20. Provider fallback behavior remains fully intact when active provider is unconfigured", `providerId: ${fallbackCommand.providerId}, fallbackUsed: ${fallbackCommand.fallbackUsed}`);
+    if (originalEnvKey) {
+        process.env.GEMINI_API_KEY = originalEnvKey;
+    }
     // =========================================================================
     // SECTION 4: RUNTIME PATH INTEGRATION VERIFICATION (Phase 4.16 Bug Fix)
     // =========================================================================

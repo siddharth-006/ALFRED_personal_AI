@@ -25,7 +25,7 @@ export interface AIProviderCapabilities {
 export interface AIProviderConfig {
     /** Identifier of the target provider */
     providerId: AIProviderId;
-    /** Target model identifier string (e.g. "llama3:latest", "gemini-1.5-pro", "claude-3-5-sonnet") */
+    /** Target model identifier string (e.g. "qwen3:latest", "gemini-3.5-flash-lite", "claude-3-5-sonnet") */
     modelName: string;
     /** Optional endpoint URL (e.g. for local Ollama server http://localhost:11434) */
     endpointUrl?: string;

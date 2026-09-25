@@ -22,6 +22,7 @@ class MockAgentPlanner {
         }
         const prompt = userRequest.trim();
         const lower = prompt.toLowerCase();
+        const cleanLower = lower.replace(/[.!?]+$/, "").trim();
         logger_1.logger.info(`MockAgentPlanner: Generating deterministic plan for -> "${prompt}"`);
         const history = (context?.recentConversation || context?.conversationHistory) || [];
         // Phase 4.13: Conversational Informational Follow-up Questions
@@ -85,6 +86,24 @@ class MockAgentPlanner {
             };
         }
         // 0. INFORMATIONAL QUESTION / ANSWER MODE SCENARIOS WITH CONTEXT
+        if (lower.includes("which workspaces do i have") ||
+            lower.includes("what workspaces do i have") ||
+            lower.includes("list my workspaces") ||
+            lower.includes("show my workspaces") ||
+            lower.includes("what are my workspaces")) {
+            let wsSummary = "You have 4 workspaces configured: DSA, Data Science, Hackathon, and Machine Learning.";
+            if (context && Array.isArray(context.workspaces) && context.workspaces.length > 0) {
+                const names = context.workspaces.map((w) => w.name || w.id);
+                wsSummary = `You have ${names.length} workspace(s) configured: ${names.join(", ")}.`;
+            }
+            return {
+                userRequest: prompt,
+                explanation: "Listing configured workspaces from application context.",
+                type: "answer",
+                answerText: wsSummary,
+                toolCalls: [],
+            };
+        }
         if (lower.includes("what should i work on") || lower.includes("pending tasks") || lower.includes("what tasks are pending")) {
             let taskSummary = "No pending tasks found.";
             if (context && Array.isArray(context.tasks)) {
@@ -492,9 +511,68 @@ class MockAgentPlanner {
                 ],
             };
         }
-        if (lower.includes("workspace for my ml project") ||
-            lower.includes("ml project workspace") ||
-            lower.includes("machine learning workspace")) {
+        // Multi-step workspace requests (e.g. "Start my DSA workspace and then open Chrome")
+        if ((lower.includes("start") || lower.includes("launch") || lower.includes("prepare") || lower.includes("open")) &&
+            (lower.includes("workspace") || lower.includes("mode") || lower.includes("environment")) &&
+            lower.includes("and") &&
+            (lower.includes("open chrome") || lower.includes("launch chrome") || lower.includes("open vs code") || lower.includes("launch vs code"))) {
+            let wsTarget = "DSA";
+            if (lower.includes("dsa") || lower.includes("coding"))
+                wsTarget = "DSA";
+            else if (lower.includes("data science") || lower.includes("datascience"))
+                wsTarget = "Data Science";
+            else if (lower.includes("hackathon"))
+                wsTarget = "Hackathon";
+            else if (lower.includes("machine learning") || lower.includes("ml"))
+                wsTarget = "Machine Learning";
+            const nextApp = (lower.includes("chrome")) ? "Chrome" : "VS Code";
+            return {
+                userRequest: prompt,
+                explanation: `Launching ${wsTarget} workspace and opening ${nextApp}.`,
+                type: "action",
+                toolCalls: [
+                    { tool: "launch_workspace", arguments: { workspaceName: wsTarget } },
+                    { tool: "launch_application", arguments: { appName: nextApp } },
+                ],
+            };
+        }
+        // Conversational workspace follow-up: "Start the Machine Learning one" / "Start the DSA one" / "Launch the ML one"
+        if ((cleanLower.match(/^(?:start|launch|open|prepare)\s+(?:the\s+)?(.+?)\s+(?:one|workspace)$/i) ||
+            cleanLower.match(/^(?:start|launch|open|prepare)\s+(?:my\s+)?(.+?)\s+(?:workspace|mode|environment)$/i)) &&
+            cleanLower !== "prepare my coding workspace") {
+            const match = cleanLower.match(/^(?:start|launch|open|prepare)\s+(?:the\s+|my\s+)?(.+?)(?:\s+(?:one|workspace|mode|environment))?$/i);
+            const candidate = match && match[1] ? match[1].trim().toLowerCase() : "";
+            let targetWs = null;
+            if (candidate === "dsa" || candidate === "coding" || candidate === "code") {
+                targetWs = "DSA";
+            }
+            else if (candidate === "data science" || candidate === "datascience" || candidate === "data science mode" || candidate === "analytics") {
+                targetWs = "Data Science";
+            }
+            else if (candidate === "hackathon" || candidate === "hack") {
+                targetWs = "Hackathon";
+            }
+            else if (candidate === "machine learning" || candidate === "ml" || candidate === "machinelearning") {
+                targetWs = "Machine Learning";
+            }
+            if (targetWs) {
+                return {
+                    userRequest: prompt,
+                    explanation: `Launching ${targetWs} workspace based on request reference.`,
+                    type: "action",
+                    toolCalls: [
+                        { tool: "launch_workspace", arguments: { workspaceName: targetWs } }
+                    ],
+                };
+            }
+        }
+        if (cleanLower.includes("workspace for my ml project") ||
+            cleanLower.includes("ml project workspace") ||
+            cleanLower.includes("machine learning workspace") ||
+            cleanLower === "start my machine learning workspace" ||
+            cleanLower === "prepare my machine learning workspace" ||
+            cleanLower === "launch my ml workspace" ||
+            cleanLower === "start ml workspace") {
             let targetWorkspace = "Machine Learning";
             if (context && Array.isArray(context.workspaces)) {
                 const mlWs = context.workspaces.find((w) => w.name?.toLowerCase().includes("machine learning") || w.type === "machinelearning");
@@ -507,6 +585,34 @@ class MockAgentPlanner {
                 type: "action",
                 toolCalls: [
                     { tool: "launch_workspace", arguments: { workspaceName: targetWorkspace } }
+                ],
+            };
+        }
+        if ((cleanLower.includes("dsa workspace") ||
+            cleanLower.includes("coding workspace") ||
+            cleanLower === "start my dsa workspace" ||
+            cleanLower === "launch my dsa workspace" ||
+            cleanLower === "open my dsa workspace") &&
+            cleanLower !== "prepare my coding workspace") {
+            return {
+                userRequest: prompt,
+                explanation: "Launching DSA workspace session.",
+                type: "action",
+                toolCalls: [
+                    { tool: "launch_workspace", arguments: { workspaceName: "DSA" } }
+                ],
+            };
+        }
+        if (lower.includes("data science workspace") ||
+            lower.includes("data science mode") ||
+            lower === "start data science mode" ||
+            lower === "launch data science workspace") {
+            return {
+                userRequest: prompt,
+                explanation: "Launching Data Science workspace session.",
+                type: "action",
+                toolCalls: [
+                    { tool: "launch_workspace", arguments: { workspaceName: "Data Science" } }
                 ],
             };
         }

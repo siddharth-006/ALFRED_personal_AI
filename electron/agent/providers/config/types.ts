@@ -12,7 +12,7 @@ export type ProviderStatusState = "ready" | "configured" | "unconfigured" | "dis
 export interface ExtendedAIProviderConfig {
     /** Target provider identifier */
     providerId: AIProviderId;
-    /** Model identifier name (e.g. "mock-v1", "llama3:latest", "gemini-1.5-pro", "claude-3-5-sonnet") */
+    /** Model identifier name (e.g. "mock-v1", "qwen3:latest", "gemini-3.5-flash-lite", "claude-3-5-sonnet") */
     modelName: string;
     /** Endpoint URL (for local models e.g. Ollama http://localhost:11434) */
     endpointUrl?: string;

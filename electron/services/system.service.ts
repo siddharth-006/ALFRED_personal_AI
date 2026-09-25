@@ -32,12 +32,17 @@ export class SystemService {
         if (!url.startsWith("http://") && !url.startsWith("https://")) {
             throw new Error("Invalid protocol for external URL.");
         }
-        await shell.openExternal(url);
+        if (shell && typeof shell.openExternal === "function") {
+            await shell.openExternal(url);
+        }
         return true;
     }
 
     public async openPath(targetPath: string): Promise<string> {
-        return await shell.openPath(targetPath);
+        if (shell && typeof shell.openPath === "function") {
+            return await shell.openPath(targetPath);
+        }
+        return "";
     }
 
     public sendNotification(title: string, body: string): boolean {

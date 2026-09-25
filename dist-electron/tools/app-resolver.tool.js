@@ -6,24 +6,52 @@
  * Strictly prevents arbitrary string execution and command injection vulnerabilities.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.appResolverTool = exports.AppResolverTool = void 0;
+exports.appResolverTool = exports.AppResolverTool = exports.APP_DISPLAY_NAMES = void 0;
 /**
  * Strict whitelist mapping normalized application names (lowercase, trimmed)
  * to exact, safe executable names.
  */
 const APP_WHITELIST = {
+    // Visual Studio Code
     "vs code": "code",
     "vscode": "code",
     "visual studio code": "code",
+    "vs_code": "code",
+    "vs-code": "code",
+    "code": "code",
+    // Google Chrome
     "chrome": "chrome",
     "google chrome": "chrome",
+    "googlechrome": "chrome",
+    "google-chrome": "chrome",
+    "google_chrome": "chrome",
+    // Spotify
     "spotify": "spotify",
+    // Discord
+    "discord": "discord",
+    // Windows Terminal
     "windows terminal": "wt",
     "terminal": "wt",
     "wt": "wt",
+    "windowsterminal": "wt",
+    "windows-terminal": "wt",
+    "windows_terminal": "wt",
+    // Power BI Desktop
     "power bi": "PBIDesktop",
     "powerbi": "PBIDesktop",
     "power bi desktop": "PBIDesktop",
+    "pbidesktop": "PBIDesktop",
+};
+/**
+ * Human-readable display names for whitelisted executable keys.
+ */
+exports.APP_DISPLAY_NAMES = {
+    code: "Visual Studio Code",
+    chrome: "Google Chrome",
+    spotify: "Spotify",
+    discord: "Discord",
+    wt: "Windows Terminal",
+    PBIDesktop: "Power BI Desktop",
 };
 /**
  * Regex to validate that executable names contain ONLY safe alphanumeric characters,
@@ -32,8 +60,9 @@ const APP_WHITELIST = {
 const SAFE_EXECUTABLE_REGEX = /^[a-zA-Z0-9_-]+$/;
 /**
  * Regex to detect potential shell metacharacters or dangerous control sequences in raw inputs.
+ * Strictly blocks path separators (/ and \), command delimiters, subshells, redirections, and pipes.
  */
-const SHELL_METACHARACTERS_REGEX = /[;&|`$()<>{}\\\n\r]/;
+const SHELL_METACHARACTERS_REGEX = /[;&|`$()<>{}\\/\n\r]/;
 class AppResolverTool {
     /**
      * Resolves a human-readable application name to a safe executable command.

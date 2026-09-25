@@ -66,10 +66,16 @@ export function registerSystemIpcHandlers(): void {
                 tasks: taskService.getTasks(),
                 goals: goalService.getGoals(),
                 projects: projectService.getProjects(),
+                workspaces: workspaceService.getWorkspaces(),
                 recentConversation: conversationContextService.getRecentTurns(),
             };
-        } else if (!effectiveOptions.context.recentConversation) {
-            effectiveOptions.context.recentConversation = conversationContextService.getRecentTurns();
+        } else {
+            if (!effectiveOptions.context.recentConversation) {
+                effectiveOptions.context.recentConversation = conversationContextService.getRecentTurns();
+            }
+            if (!effectiveOptions.context.workspaces) {
+                effectiveOptions.context.workspaces = workspaceService.getWorkspaces();
+            }
         }
         return await commandAgentService.executeCommand(prompt, effectiveOptions);
     });

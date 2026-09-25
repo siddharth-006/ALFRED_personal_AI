@@ -25,18 +25,52 @@ export type AppResolutionResult = AppResolutionSuccess | AppResolutionFailure;
  * to exact, safe executable names.
  */
 const APP_WHITELIST: Record<string, string> = {
+    // Visual Studio Code
     "vs code": "code",
     "vscode": "code",
     "visual studio code": "code",
+    "vs_code": "code",
+    "vs-code": "code",
+    "code": "code",
+
+    // Google Chrome
     "chrome": "chrome",
     "google chrome": "chrome",
+    "googlechrome": "chrome",
+    "google-chrome": "chrome",
+    "google_chrome": "chrome",
+
+    // Spotify
     "spotify": "spotify",
+
+    // Discord
+    "discord": "discord",
+
+    // Windows Terminal
     "windows terminal": "wt",
     "terminal": "wt",
     "wt": "wt",
+    "windowsterminal": "wt",
+    "windows-terminal": "wt",
+    "windows_terminal": "wt",
+
+    // Power BI Desktop
     "power bi": "PBIDesktop",
     "powerbi": "PBIDesktop",
     "power bi desktop": "PBIDesktop",
+    "pbidesktop": "PBIDesktop",
+};
+
+/**
+ * Human-readable display names for whitelisted executable keys.
+ */
+export const APP_DISPLAY_NAMES: Record<string, string> = {
+    code: "Visual Studio Code",
+    chrome: "Google Chrome",
+    spotify: "Spotify",
+    discord: "Discord",
+    wt: "Windows Terminal",
+    PBIDesktop: "Power BI Desktop",
 };
 
 /**
@@ -47,8 +81,9 @@ const SAFE_EXECUTABLE_REGEX = /^[a-zA-Z0-9_-]+$/;
 
 /**
  * Regex to detect potential shell metacharacters or dangerous control sequences in raw inputs.
+ * Strictly blocks path separators (/ and \), command delimiters, subshells, redirections, and pipes.
  */
-const SHELL_METACHARACTERS_REGEX = /[;&|`$()<>{}\\\n\r]/;
+const SHELL_METACHARACTERS_REGEX = /[;&|`$()<>{}\\/\n\r]/;
 
 export class AppResolverTool {
     /**

@@ -54,11 +54,17 @@ function registerSystemIpcHandlers() {
                 tasks: task_service_1.taskService.getTasks(),
                 goals: goal_service_1.goalService.getGoals(),
                 projects: project_service_1.projectService.getProjects(),
+                workspaces: workspace_service_1.workspaceService.getWorkspaces(),
                 recentConversation: conversation_context_service_1.conversationContextService.getRecentTurns(),
             };
         }
-        else if (!effectiveOptions.context.recentConversation) {
-            effectiveOptions.context.recentConversation = conversation_context_service_1.conversationContextService.getRecentTurns();
+        else {
+            if (!effectiveOptions.context.recentConversation) {
+                effectiveOptions.context.recentConversation = conversation_context_service_1.conversationContextService.getRecentTurns();
+            }
+            if (!effectiveOptions.context.workspaces) {
+                effectiveOptions.context.workspaces = workspace_service_1.workspaceService.getWorkspaces();
+            }
         }
         return await command_agent_service_1.commandAgentService.executeCommand(prompt, effectiveOptions);
     });

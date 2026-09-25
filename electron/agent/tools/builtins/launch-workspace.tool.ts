@@ -32,17 +32,20 @@ export const launchWorkspaceTool: ToolDefinition<LaunchWorkspaceInput, Workspace
         }
         return { valid: true };
     },
-    execute: async (input: LaunchWorkspaceInput | any): Promise<ToolResult<WorkspaceLaunchResult>> => {
+    execute: async (
+        input: LaunchWorkspaceInput | any,
+        options?: any
+    ): Promise<ToolResult<WorkspaceLaunchResult>> => {
         const rawTarget = input.workspace || input.workspaceName;
         const wsTarget = typeof rawTarget === "string" ? rawTarget.trim() : rawTarget;
         logger.info(`launch_workspace tool: Launching workspace via WorkspaceService...`);
 
         try {
-            const result = await workspaceService.launchWorkspace(wsTarget);
+            const result = await workspaceService.launchWorkspace(wsTarget, options);
             return {
                 success: result.success,
                 data: result,
-                error: result.success ? undefined : "One or more workspace items failed to launch.",
+                error: result.success ? undefined : (result.error || "One or more workspace items failed to launch."),
             };
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : "Workspace launch exception";

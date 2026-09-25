@@ -14,9 +14,9 @@
 export interface GeminiClientConfig {
     /** Target API Key */
     apiKey?: string;
-    /** Model identifier, e.g. "gemini-1.5-pro" or "gemini-1.5-flash" */
+    /** Model identifier, e.g. "gemini-3.5-flash-lite" */
     modelName: string;
-    /** Request timeout in milliseconds (default: 15_000) */
+    /** Request timeout in milliseconds (default: 60_000) */
     timeoutMs?: number;
 }
 
@@ -69,9 +69,9 @@ export async function geminiGenerate(
         };
     }
 
-    const model = config.modelName || "gemini-1.5-pro";
+    const model = config.modelName || "gemini-3.5-flash-lite";
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey.trim())}`;
-    const timeoutMs = config.timeoutMs ?? 15_000;
+    const timeoutMs = config.timeoutMs ?? 60_000;
 
     const payload = {
         contents: [
@@ -89,12 +89,25 @@ export async function geminiGenerate(
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-        const res = await fetch(url, {
+        let res = await fetch(url, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
             signal: controller.signal,
         });
+
+        if (res.status === 503) {
+            // High demand spikes on free/standard tier are transient; retry once after 2s
+            await new Promise((r) => setTimeout(r, 2000));
+            if (!controller.signal.aborted) {
+                res = await fetch(url, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                    signal: controller.signal,
+                });
+            }
+        }
 
         clearTimeout(timer);
 

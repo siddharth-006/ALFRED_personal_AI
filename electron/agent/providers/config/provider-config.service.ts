@@ -41,7 +41,7 @@ export class ProviderConfigService {
         },
         gemini: {
             providerId: "gemini",
-            modelName: "gemini-1.5-pro",
+            modelName: "gemini-3.5-flash-lite",
             enabled: false,
             apiKeyConfigured: false,
             temperature: 0.7,
@@ -274,7 +274,7 @@ export class ProviderConfigService {
         };
         this.configs.gemini = {
             providerId: "gemini",
-            modelName: "gemini-1.5-pro",
+            modelName: "gemini-3.5-flash-lite",
             enabled: false,
             apiKeyConfigured: false,
             temperature: 0.7,

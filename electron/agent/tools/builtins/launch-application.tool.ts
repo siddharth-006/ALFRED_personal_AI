@@ -4,7 +4,9 @@ import { appExecutorTool } from "../../../tools/app-executor.tool";
 import { logger } from "../../../utils/logger";
 
 export interface LaunchApplicationInput {
-    appName: string;
+    appName?: string;
+    application?: string;
+    target?: string;
 }
 
 export interface LaunchApplicationOutput {
@@ -14,23 +16,25 @@ export interface LaunchApplicationOutput {
 }
 
 /**
- * launch_application tool adapter (Phase 3.3 - Step 1)
+ * launch_application tool adapter (Phase 5.1 - Native Desktop Application Control)
  *
- * Safely resolves human-readable app names against strict AppResolverTool whitelist
- * and launches via AppExecutorTool. Strictly prevents dynamic process spawning or path execution.
+ * Safely resolves human-readable app names or identifiers against strict AppResolverTool whitelist
+ * and launches via AppExecutorTool. Strictly prevents dynamic process spawning, shell execution, or path execution.
  */
 export const launchApplicationTool: ToolDefinition<LaunchApplicationInput, LaunchApplicationOutput> = {
     name: "launch_application",
-    description: "Launch a whitelisted desktop application (e.g. VS Code, Chrome, Spotify, Windows Terminal, Power BI)",
+    description: "Launch a whitelisted desktop application (e.g. VS Code, Chrome, Spotify, Discord, Windows Terminal, Power BI)",
     category: "application",
     validateInput: (input: unknown) => {
         if (!input || typeof input !== "object") {
-            return { valid: false, error: "Input must be an object with an 'appName' string property." };
+            return { valid: false, error: "Input must be an object with an application identifier property ('appName' or 'application')." };
         }
-        const { appName } = input as Record<string, unknown>;
-        if (typeof appName !== "string" || !appName.trim()) {
+        const record = input as Record<string, unknown>;
+        const rawName = record.appName ?? record.application ?? record.target;
+        if (typeof rawName !== "string" || !rawName.trim()) {
             return { valid: false, error: "Application name ('appName') must be a non-empty string." };
         }
+        const appName = rawName.trim();
         // Security check: reject explicit path separators or shell metacharacters
         if (/[/\\]/.test(appName)) {
             return { valid: false, error: "Application name cannot contain file paths or path separators." };
@@ -41,12 +45,14 @@ export const launchApplicationTool: ToolDefinition<LaunchApplicationInput, Launc
         return { valid: true };
     },
     execute: async (input: LaunchApplicationInput, options?: ToolExecutionOptions): Promise<ToolResult<LaunchApplicationOutput>> => {
-        logger.info(`launch_application tool: Resolving target app '${input.appName}'...`);
+        const rawName = input.appName ?? input.application ?? input.target ?? "";
+        const appName = rawName.trim();
+        logger.info(`launch_application tool: Resolving target app '${appName}'...`);
 
         // Step 1: Pass through strict AppResolverTool whitelist check
-        const resolution = appResolverTool.resolveApplication(input.appName);
+        const resolution = appResolverTool.resolveApplication(appName);
         if (!resolution.success) {
-            logger.warn(`launch_application tool rejected target '${input.appName}': ${resolution.error}`);
+            logger.warn(`launch_application tool rejected target '${appName}': ${resolution.error}`);
             return {
                 success: false,
                 error: resolution.error || "Unsupported or invalid application name.",
@@ -69,7 +75,7 @@ export const launchApplicationTool: ToolDefinition<LaunchApplicationInput, Launc
         } else {
             return {
                 success: false,
-                error: execResult.error || `Failed to execute ${resolution.appName}`,
+                error: execResult.error || `${resolution.appName} could not be found on this system.`,
             };
         }
     },

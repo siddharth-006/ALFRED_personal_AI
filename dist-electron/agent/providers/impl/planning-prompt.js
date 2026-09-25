@@ -15,8 +15,8 @@ exports.buildAgentSystemPrompt = buildAgentSystemPrompt;
 exports.ALFRED_TOOL_CATALOG = [
     {
         name: "launch_application",
-        description: "Launch a whitelisted desktop application (e.g. VS Code, Chrome, Spotify, Windows Terminal, Power BI)",
-        args: { appName: "string (e.g. 'VS Code', 'Chrome', 'Spotify')" },
+        description: "Launch a whitelisted desktop application (e.g. VS Code, Chrome, Spotify, Discord, Windows Terminal, Power BI)",
+        args: { appName: "string (e.g. 'VS Code', 'Chrome', 'Spotify', 'Discord', 'Terminal')" },
     },
     {
         name: "navigate",

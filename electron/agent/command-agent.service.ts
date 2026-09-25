@@ -17,6 +17,7 @@ import { conversationContextService, TargetEntity } from "../services/conversati
 import { taskService } from "../services/task.service";
 import { goalService } from "../services/goal.service";
 import { projectService } from "../services/project.service";
+import { workspaceService } from "../services/workspace.service";
 import { registerDefaultProviders } from "./providers";
 import { registerDefaultTools, toolRegistry } from "./tools";
 import { AgentExecutionResult, AgentPlan, AgentToolCallResult } from "./orchestrator/types";
@@ -251,6 +252,9 @@ export class CommandAgentService {
         }
         if (!effectiveContext.projects) {
             effectiveContext.projects = projectService.getProjects();
+        }
+        if (!effectiveContext.workspaces) {
+            effectiveContext.workspaces = workspaceService.getWorkspaces();
         }
 
         if (available) {
@@ -565,7 +569,7 @@ export class CommandAgentService {
                 appName = (args.sessionName || args.appName || null) as string | null;
             } else if (firstTool.tool === "launch_workspace") {
                 mappedIntent = "launch_workspace";
-                appName = (args.workspaceName || args.name || null) as string | null;
+                appName = (args.workspaceName || args.workspace || args.name || null) as string | null;
             } else if (firstTool.tool === "show_tasks") {
                 mappedIntent = "show_tasks";
             } else if (firstTool.tool === "create_task") {
@@ -614,7 +618,7 @@ export class CommandAgentService {
                 executable,
                 executed: true,
                 providerId: activeProviderId,
-                explanation: multiStepSummary || orchResult.plan?.explanation,
+                explanation: multiStepSummary || (toolDataObj?.summary as string) || orchResult.plan?.explanation,
                 responseType: "action",
                 data: firstTool.data,
                 task: taskData,

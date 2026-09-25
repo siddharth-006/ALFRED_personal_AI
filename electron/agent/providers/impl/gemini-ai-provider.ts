@@ -61,8 +61,8 @@ export class GeminiAIProvider implements IAIProvider {
 
         return {
             apiKey:    this.clientConfig.apiKey    || envConfig.apiKey,
-            modelName: this.clientConfig.modelName || envConfig.modelName || "gemini-1.5-pro",
-            timeoutMs: this.clientConfig.timeoutMs ?? 15_000,
+            modelName: this.clientConfig.modelName || envConfig.modelName || "gemini-3.5-flash-lite",
+            timeoutMs: this.clientConfig.timeoutMs ?? 60_000,
         };
     }
 

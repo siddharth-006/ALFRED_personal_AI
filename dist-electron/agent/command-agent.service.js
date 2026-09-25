@@ -13,6 +13,7 @@ const conversation_context_service_1 = require("../services/conversation-context
 const task_service_1 = require("../services/task.service");
 const goal_service_1 = require("../services/goal.service");
 const project_service_1 = require("../services/project.service");
+const workspace_service_1 = require("../services/workspace.service");
 const providers_1 = require("./providers");
 const tools_1 = require("./tools");
 const risk_1 = require("./risk");
@@ -224,6 +225,9 @@ class CommandAgentService {
         }
         if (!effectiveContext.projects) {
             effectiveContext.projects = project_service_1.projectService.getProjects();
+        }
+        if (!effectiveContext.workspaces) {
+            effectiveContext.workspaces = workspace_service_1.workspaceService.getWorkspaces();
         }
         if (available) {
             logger_1.logger.info(`CommandAgentService: Routing request to ${providerName} via AgentOrchestrator -> "${prompt}"`);
@@ -494,7 +498,7 @@ class CommandAgentService {
             }
             else if (firstTool.tool === "launch_workspace") {
                 mappedIntent = "launch_workspace";
-                appName = (args.workspaceName || args.name || null);
+                appName = (args.workspaceName || args.workspace || args.name || null);
             }
             else if (firstTool.tool === "show_tasks") {
                 mappedIntent = "show_tasks";
@@ -545,7 +549,7 @@ class CommandAgentService {
                 executable,
                 executed: true,
                 providerId: activeProviderId,
-                explanation: multiStepSummary || orchResult.plan?.explanation,
+                explanation: multiStepSummary || toolDataObj?.summary || orchResult.plan?.explanation,
                 responseType: "action",
                 data: firstTool.data,
                 task: taskData,

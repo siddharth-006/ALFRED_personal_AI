@@ -38,29 +38,55 @@ const CONVERSATIONAL_PREFIXES = [
  * Known human-readable app target mappings for application launching.
  */
 const HUMAN_APP_NAMES = {
+    // Visual Studio Code
     "vs code": "VS Code",
     "vscode": "VS Code",
     "visual studio code": "VS Code",
+    "vs_code": "VS Code",
+    "vs-code": "VS Code",
+    "code": "VS Code",
+    // Google Chrome
     "chrome": "Chrome",
     "google chrome": "Chrome",
+    "googlechrome": "Chrome",
+    "google-chrome": "Chrome",
+    "google_chrome": "Chrome",
+    // Spotify
     "spotify": "Spotify",
+    // Discord
+    "discord": "Discord",
+    // Windows Terminal
     "windows terminal": "Windows Terminal",
     "terminal": "Windows Terminal",
     "wt": "Windows Terminal",
+    "windowsterminal": "Windows Terminal",
+    "windows-terminal": "Windows Terminal",
+    "windows_terminal": "Windows Terminal",
+    // Power BI Desktop
     "power bi": "Power BI",
     "powerbi": "Power BI",
     "power bi desktop": "Power BI",
+    "pbidesktop": "Power BI",
 };
 /**
  * Known workspace target mappings for launch_workspace intent.
  */
 const WORKSPACE_TARGET_MAPPINGS = {
     "hackathon": "Hackathon",
+    "hack": "Hackathon",
     "coding": "DSA",
     "dsa": "DSA",
+    "code": "DSA",
+    "problem solving": "DSA",
     "data science": "Data Science",
     "datascience": "Data Science",
+    "data-science": "Data Science",
+    "ds": "Data Science",
+    "data science mode": "Data Science",
+    "analytics": "Data Science",
     "machine learning": "Machine Learning",
+    "machinelearning": "Machine Learning",
+    "machine-learning": "Machine Learning",
     "ml": "Machine Learning",
     "college": "College",
     "personal": "Personal",
@@ -118,10 +144,13 @@ class RuleCommandInterpreter {
             return { intent: "show_tasks", target: null };
         }
         // 4. WORKSPACE LAUNCH INTENT
-        // e.g. "open my hackathon workspace", "start my coding workspace", "launch the hackathon workspace"
-        const workspaceMatch = lowerCleaned.match(/^(?:open|start|launch|go to)\s+(?:my\s+|the\s+)?(.+?)(?:\s+workspace)?$/i);
+        // e.g. "open my hackathon workspace", "start my coding workspace", "prepare my machine learning workspace", "start Data Science mode"
+        const workspaceMatch = lowerCleaned.match(/^(?:open|start|launch|prepare|switch to|go to)\s+(?:my\s+|the\s+)?(.+?)(?:\s+(?:workspace|mode|environment|setup|session))?$/i);
         if (workspaceMatch && workspaceMatch[1]) {
-            const rawWsCandidate = workspaceMatch[1].trim().toLowerCase().replace(/\s+workspace$/, "");
+            const rawWsCandidate = workspaceMatch[1]
+                .trim()
+                .toLowerCase()
+                .replace(/\s+(?:workspace|mode|environment|setup|session)$/, "");
             if (WORKSPACE_TARGET_MAPPINGS[rawWsCandidate]) {
                 return {
                     intent: "launch_workspace",
