@@ -1,6 +1,4 @@
 import { WorkspaceType } from "@/context/WorkspaceContext";
-import { ProjectCategory } from "@/context/ProjectContext";
-import { TaskCategory } from "@/context/TaskContext";
 
 // Both TaskCategory and ProjectCategory share the same values in ALFRED
 export type Category = "DSA" | "Data Science" | "College" | "Hackathon" | "Personal";

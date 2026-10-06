@@ -34,9 +34,9 @@ export class ProviderConfigService {
         ollama: {
             providerId: "ollama",
             modelName: "qwen3:latest",
-            endpointUrl: "http://localhost:11434",
-            enabled: false,
-            apiKeyConfigured: false,
+            endpointUrl: "http://127.0.0.1:11434",
+            enabled: true,
+            apiKeyConfigured: true,
             temperature: 0.7,
         },
         gemini: {
@@ -191,7 +191,8 @@ export class ProviderConfigService {
         }
 
         let status: ProviderStatusState = "unconfigured";
-        if (!config.enabled) {
+        const isEnabled = (id === "ollama" || id === "mock") ? true : config.enabled;
+        if (!isEnabled) {
             status = "disabled";
         } else if (configured) {
             status = "ready";
@@ -202,7 +203,7 @@ export class ProviderConfigService {
         return {
             providerId: id,
             name,
-            enabled: config.enabled,
+            enabled: isEnabled,
             configured,
             status,
             modelName: config.modelName,
@@ -267,9 +268,9 @@ export class ProviderConfigService {
         this.configs.ollama = {
             providerId: "ollama",
             modelName: "qwen3:latest",
-            endpointUrl: "http://localhost:11434",
-            enabled: false,
-            apiKeyConfigured: false,
+            endpointUrl: "http://127.0.0.1:11434",
+            enabled: true,
+            apiKeyConfigured: true,
             temperature: 0.7,
         };
         this.configs.gemini = {

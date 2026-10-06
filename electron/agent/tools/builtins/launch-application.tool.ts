@@ -39,7 +39,7 @@ export const launchApplicationTool: ToolDefinition<LaunchApplicationInput, Launc
         if (/[/\\]/.test(appName)) {
             return { valid: false, error: "Application name cannot contain file paths or path separators." };
         }
-        if (/[;&|`$()<>{}\n\r]/.test(appName)) {
+        if (/[;&|`$<>{}\n\r]/.test(appName)) {
             return { valid: false, error: "Application name contains invalid shell characters." };
         }
         return { valid: true };
@@ -60,7 +60,12 @@ export const launchApplicationTool: ToolDefinition<LaunchApplicationInput, Launc
         }
 
         // Step 2: Execute via AppExecutorTool
-        const execOptions = { isMock: options?.isMock ?? false };
+        const execOptions = {
+            isMock: options?.isMock ?? false,
+            appId: resolution.appId,
+            arguments: resolution.arguments,
+            workingDirectory: resolution.workingDirectory,
+        };
         const execResult = await appExecutorTool.execute(resolution.executable, execOptions);
 
         if (execResult.success) {

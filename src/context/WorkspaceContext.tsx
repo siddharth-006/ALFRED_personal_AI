@@ -94,24 +94,62 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    const savedWorkspaces = localStorage.getItem("alfred_workspaces");
-    if (savedWorkspaces) {
-      setWorkspaces(JSON.parse(savedWorkspaces));
-    } else {
-      setWorkspaces(INITIAL_WORKSPACES);
+    async function initWorkspaces() {
+      // 1. Try loading from electron backend first
+      if (typeof window !== "undefined" && window.electron?.workspace?.getAll) {
+        try {
+          const backendWs = await window.electron.workspace.getAll();
+          if (Array.isArray(backendWs) && backendWs.length > 0) {
+            setWorkspaces(backendWs);
+            localStorage.setItem("alfred_workspaces", JSON.stringify(backendWs));
+            initFocus();
+            setIsLoaded(true);
+            return;
+          }
+        } catch (e) {
+          console.warn("[WorkspaceContext] Error fetching from backend:", e);
+        }
+      }
+
+      // 2. Fallback to localStorage or defaults
+      const savedWorkspaces = localStorage.getItem("alfred_workspaces");
+      if (savedWorkspaces) {
+        try {
+          const parsed = JSON.parse(savedWorkspaces);
+          setWorkspaces(parsed);
+          if (typeof window !== "undefined" && window.electron?.workspace?.sync) {
+            window.electron.workspace.sync(parsed).catch(() => {});
+          }
+        } catch {
+          setWorkspaces(INITIAL_WORKSPACES);
+        }
+      } else {
+        setWorkspaces(INITIAL_WORKSPACES);
+        if (typeof window !== "undefined" && window.electron?.workspace?.sync) {
+          window.electron.workspace.sync(INITIAL_WORKSPACES).catch(() => {});
+        }
+      }
+
+      initFocus();
+      setIsLoaded(true);
     }
 
-    const savedFocus = localStorage.getItem("alfred_focus");
-    if (savedFocus) {
-      setCurrentFocus(savedFocus as FocusType);
+    function initFocus() {
+      const savedFocus = localStorage.getItem("alfred_focus");
+      if (savedFocus) {
+        setCurrentFocus(savedFocus as FocusType);
+      }
     }
-    
-    setIsLoaded(true);
+
+    initWorkspaces();
   }, []);
 
   useEffect(() => {
     if (isLoaded) {
       localStorage.setItem("alfred_workspaces", JSON.stringify(workspaces));
+      if (typeof window !== "undefined" && window.electron?.workspace?.sync) {
+        window.electron.workspace.sync(workspaces).catch(() => {});
+      }
     }
   }, [workspaces, isLoaded]);
 
@@ -149,6 +187,16 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const launchWorkspace = (id: string) => {
     setWorkspaces(workspaces.map(ws => {
       if (ws.id === id) {
+        if (typeof window !== "undefined") {
+          import("@/utils/activityBus").then(({ dispatchAlfredActivity }) => {
+            dispatchAlfredActivity({
+              type: "workspace_launched",
+              state: "executing",
+              label: "WORKSPACE LAUNCHED",
+              detail: `${ws.name} environment activated`,
+            });
+          });
+        }
         return {
           ...ws,
           launchCount: ws.launchCount + 1,

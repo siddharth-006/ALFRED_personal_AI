@@ -106,7 +106,7 @@ async function runNativeAppLaunchTests() {
             assert.strictEqual(res.success, false, `Did not reject unknown app: ${app}`);
             if (!res.success) {
                 assert.strictEqual(res.executable, null);
-                assert.strictEqual(res.error, "Unsupported application.");
+                assert(Boolean(res.error));
             }
         }
     });

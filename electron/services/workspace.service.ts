@@ -1,7 +1,8 @@
 import { appResolverTool } from "../tools/app-resolver.tool";
-import { appExecutorTool, AppExecutionOptions } from "../tools/app-executor.tool";
+import { appExecutorTool, AppExecutionOptions, AppExecutionResult } from "../tools/app-executor.tool";
 import { systemService } from "./system.service";
 import { logger } from "../utils/logger";
+import { eventBus } from "../events/event-bus";
 
 export interface WorkspaceStatus {
     active: boolean;
@@ -138,15 +139,64 @@ const CANONICAL_WORKSPACE_ALIASES: Record<string, string> = {
 };
 
 /** Shell metacharacters regex for path validation */
-const SHELL_METACHARACTERS_REGEX = /[;&|`$()<>{}\n\r]/;
+const SHELL_METACHARACTERS_REGEX = /[;&|`$<>{}\n\r]/;
+
+import fs from "fs";
+import path from "path";
+import { getUserDataDirectory } from "../utils/paths";
+import { approvedAppsService } from "./approved-apps.service";
 
 export class WorkspaceService {
     private workspaces: Workspace[] = [];
+    private storagePath: string;
 
-    constructor(initialWorkspaces?: Workspace[]) {
-        this.workspaces = initialWorkspaces
-            ? initialWorkspaces.map((w) => ({ ...w }))
-            : DEFAULT_INITIAL_WORKSPACES.map((w) => ({ ...w }));
+    constructor(initialWorkspaces?: Workspace[], customStoragePath?: string) {
+        this.storagePath = customStoragePath || path.join(getUserDataDirectory(), "alfred_workspaces.json");
+        if (initialWorkspaces) {
+            this.workspaces = initialWorkspaces.map((w) => ({ ...w }));
+        } else {
+            this.loadWorkspaces();
+        }
+    }
+
+    private loadWorkspaces(): void {
+        try {
+            if (fs.existsSync(this.storagePath)) {
+                const data = fs.readFileSync(this.storagePath, "utf8");
+                const parsed = JSON.parse(data);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    this.workspaces = parsed.map((w) => ({
+                        id: String(w.id || ""),
+                        name: String(w.name || "").trim(),
+                        description: String(w.description || "").trim(),
+                        type: (w.type as WorkspaceType) || "custom",
+                        applications: Array.isArray(w.applications) ? w.applications.map(String) : [],
+                        websites: Array.isArray(w.websites) ? w.websites.map(String) : [],
+                        localFolders: Array.isArray(w.localFolders) ? w.localFolders.map(String) : [],
+                        createdDate: w.createdDate,
+                        launchCount: typeof w.launchCount === "number" ? w.launchCount : 0,
+                        lastLaunched: w.lastLaunched || null,
+                    }));
+                    logger.info(`WorkspaceService: Loaded ${this.workspaces.length} workspace(s) from disk.`);
+                    return;
+                }
+            }
+        } catch (err: any) {
+            logger.warn(`WorkspaceService: Error loading stored workspaces: ${err?.message}. Using defaults.`);
+        }
+
+        this.workspaces = DEFAULT_INITIAL_WORKSPACES.map((w) => ({ ...w }));
+        this.saveWorkspaces();
+    }
+
+    private saveWorkspaces(): void {
+        try {
+            const dir = path.dirname(this.storagePath);
+            if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+            fs.writeFileSync(this.storagePath, JSON.stringify(this.workspaces, null, 2), "utf8");
+        } catch (err: any) {
+            logger.error(`WorkspaceService: Failed to save workspaces: ${err?.message}`);
+        }
     }
 
     /**
@@ -178,7 +228,8 @@ export class WorkspaceService {
                 launchCount: typeof w.launchCount === "number" ? w.launchCount : 0,
                 lastLaunched: w.lastLaunched || null,
             }));
-            logger.info(`WorkspaceService: Synced ${this.workspaces.length} workspace(s).`);
+            this.saveWorkspaces();
+            logger.info(`WorkspaceService: Synced and saved ${this.workspaces.length} workspace(s).`);
         }
     }
 
@@ -361,7 +412,18 @@ export class WorkspaceService {
                 );
 
                 try {
-                    const execResult = await appExecutorTool.execute(approvedExecutable, options);
+                    const execOptions: AppExecutionOptions = {
+                        ...options,
+                        appId: resolution.appId,
+                        arguments: resolution.arguments,
+                        workingDirectory: resolution.workingDirectory,
+                    };
+                    const execResult = await Promise.race([
+                        appExecutorTool.execute(approvedExecutable, execOptions),
+                        new Promise<AppExecutionResult>((_, reject) =>
+                            setTimeout(() => reject(new Error("Application launch timed out")), 5000)
+                        ),
+                    ]);
                     if (execResult.success) {
                         results.push({
                             success: true,
@@ -413,7 +475,12 @@ export class WorkspaceService {
                 }
 
                 try {
-                    const openErr = await systemService.openPath(folderPath);
+                    const openErr = await Promise.race([
+                        systemService.openPath(folderPath),
+                        new Promise<string>((_, reject) =>
+                            setTimeout(() => reject(new Error("Folder open timed out")), 5000)
+                        ),
+                    ]);
                     if (openErr) {
                         logger.error(`WorkspaceService: Error opening path '${folderPath}': ${openErr}`);
                         results.push({
@@ -457,7 +524,12 @@ export class WorkspaceService {
                 }
 
                 try {
-                    await systemService.openExternalUrl(url);
+                    await Promise.race([
+                        systemService.openExternalUrl(url),
+                        new Promise<boolean>((_, reject) =>
+                            setTimeout(() => reject(new Error("URL open timed out")), 5000)
+                        ),
+                    ]);
                     results.push({
                         success: true,
                         type: "url",
@@ -485,6 +557,14 @@ export class WorkspaceService {
         }
 
         const overallSuccess = results.length === 0 || results.every((r) => r.success);
+
+        if (overallSuccess) {
+            eventBus.publish("workspace_launched", {
+                workspaceId,
+                name: workspaceName,
+                type: (targetWorkspace as any)?.type,
+            });
+        }
 
         // Build concise execution summary
         const summaryLines: string[] = [`Starting your ${workspaceName} workspace.`];

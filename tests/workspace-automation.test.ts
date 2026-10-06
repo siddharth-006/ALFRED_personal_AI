@@ -56,6 +56,8 @@ async function runWorkspaceAutomationTests() {
 
     // Reset workspace service to canonical state
     workspaceService.reset();
+    const { providerConfigService } = await import("../electron/agent/providers/config/provider-config.service");
+    providerConfigService.setActiveProviderId("mock");
 
     // =========================================================================
     // SECTION 1: WORKSPACE RESOLUTION & ALIASES
@@ -194,7 +196,12 @@ async function runWorkspaceAutomationTests() {
         for (const item of result.results) {
             assert.strictEqual(item.success, false);
             assert.strictEqual(item.type, "application");
-            assert(item.error?.includes("Unsupported application") || item.error?.includes("invalid or unsafe"));
+            assert(
+                item.error?.includes("Unsupported application") ||
+                item.error?.includes("invalid or unsafe") ||
+                item.error?.includes("couldn't find an approved application") ||
+                item.error?.includes("not been approved")
+            );
         }
     });
 

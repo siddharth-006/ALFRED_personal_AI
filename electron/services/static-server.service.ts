@@ -62,20 +62,43 @@ export function startStaticServer(): Promise<string> {
             });
         });
 
-        server.listen(0, "127.0.0.1", () => {
-            const address = server.address();
-            if (typeof address === "object" && address !== null) {
-                const serverUrl = `http://127.0.0.1:${address.port}`;
-                logger.info(`Static Server listening on ${serverUrl}`);
-                resolve(serverUrl);
+        const tryPort = (port: number) => {
+            server.listen(port, "127.0.0.1", () => {
+                const address = server.address();
+                if (typeof address === "object" && address !== null) {
+                    const serverUrl = `http://127.0.0.1:${address.port}`;
+                    logger.info(`Static Server listening on ${serverUrl}`);
+                    resolve(serverUrl);
+                } else {
+                    reject(new Error("Failed to retrieve server port"));
+                }
+            });
+        };
+
+        server.once("error", (err: any) => {
+            if (err?.code === "EADDRINUSE") {
+                logger.warn("Port 51734 in use, falling back to ephemeral port.");
+                server.removeAllListeners("error");
+                server.once("error", (fatalErr) => {
+                    logger.error(`Static Server failed to start: ${fatalErr.message}`);
+                    reject(fatalErr);
+                });
+                server.listen(0, "127.0.0.1", () => {
+                    const address = server.address();
+                    if (typeof address === "object" && address !== null) {
+                        const serverUrl = `http://127.0.0.1:${address.port}`;
+                        logger.info(`Static Server listening on fallback ${serverUrl}`);
+                        resolve(serverUrl);
+                    } else {
+                        reject(new Error("Failed to retrieve server port"));
+                    }
+                });
             } else {
-                reject(new Error("Failed to retrieve server port"));
+                logger.error(`Static Server failed to start: ${err.message}`);
+                reject(err);
             }
         });
 
-        server.on("error", (err) => {
-            logger.error(`Static Server failed to start: ${err.message}`);
-            reject(err);
-        });
+        tryPort(51734);
     });
 }

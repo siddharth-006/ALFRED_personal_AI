@@ -70,6 +70,51 @@ export class ConfirmationStore {
     }
 
     /**
+     * Stores a memory mutation proposal awaiting explicit user confirmation (Phase 5.7).
+     */
+    public createPendingMemoryConfirmation(
+        proposal: any,
+        userRequest: string
+    ): PendingConfirmation {
+        const now = Date.now();
+        const id = this.generateId();
+
+        const dummyPlan: AgentPlan = {
+            userRequest,
+            explanation: proposal.promptPreview,
+            type: "action",
+            toolCalls: [],
+        };
+
+        const risk: RiskEvaluationResult = {
+            riskLevel: "medium",
+            level: "medium",
+            requiresConfirmation: true,
+            mutationCount: 1,
+            mutationTools: ["memory_mutation"],
+            reason: `User confirmation required to ${proposal.type} memory`,
+            summary: `Memory ${proposal.type}`,
+        };
+
+        const pending: PendingConfirmation = {
+            id,
+            userRequest: String(userRequest || ""),
+            plan: dummyPlan,
+            risk,
+            memoryProposal: JSON.parse(JSON.stringify(proposal)),
+            createdAt: now,
+            expiresAt: now + this.ttlMs,
+        };
+
+        this.pendingMap.set(id, pending);
+        logger.info(
+            `ConfirmationStore: Created pending memory confirmation '${id}' for prompt "${userRequest}" (${proposal.type})`
+        );
+
+        return { ...pending };
+    }
+
+    /**
      * Retrieves pending confirmation if present and unexpired.
      */
     public getPendingConfirmation(id: string): PendingConfirmation | undefined {
@@ -110,6 +155,19 @@ export class ConfirmationStore {
             logger.info(`ConfirmationStore: Cancelled pending confirmation '${id}'.`);
         }
         return exists;
+    }
+
+    /**
+     * Retrieves the most recently created active pending confirmation.
+     */
+    public getLatestPendingConfirmation(): PendingConfirmation | undefined {
+        const keys = Array.from(this.pendingMap.keys());
+        if (keys.length === 0) return undefined;
+        for (let i = keys.length - 1; i >= 0; i--) {
+            const pending = this.getPendingConfirmation(keys[i]);
+            if (pending) return pending;
+        }
+        return undefined;
     }
 
     /**

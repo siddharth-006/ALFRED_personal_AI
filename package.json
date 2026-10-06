@@ -7,10 +7,14 @@
   "main": "dist-electron/main/index.js",
   "scripts": {
     "dev": "next dev --turbopack",
-    "compile:electron": "tsc -p tsconfig.electron.json",
-    "electron": "tsc -p tsconfig.electron.json && electron .",
+    "test": "tsx tests/ambient-mode.test.ts && tsx tests/audio-system.test.ts && tsx tests/dashboard-focus.test.ts && tsx tests/native-app-launch.test.ts && tsx tests/workspace-automation.test.ts && tsx tests/analytics.test.ts && tsx tests/boot-sequence.test.ts && tsx tests/voice-input.test.ts && tsx tests/wake-word.test.ts && tsx tests/vad-silence-detection.test.ts && tsx tests/tts-service.test.ts && tsx tests/agent-context.test.ts && tsx tests/recommendation-agent.test.ts && tsx tests/proactive-intelligence.test.ts && tsx tests/agentic-planning.test.ts && tsx tests/memory-personalization.test.ts && tsx tests/routine-engine.test.ts && tsx tests/morning-briefing.test.ts && tsx tests/coding-session.test.ts && tsx tests/end-of-day-review.test.ts && tsx tests/desktop-presence.test.ts && tsx tests/background-intelligence-milestone.test.ts && tsx tests/final-milestone.test.ts && tsx tests/release-readiness.test.ts && tsx tests/installed-build-fixes.test.ts && tsx tests/interactive-demo.test.ts && tsx tests/first-launch-lifecycle.test.ts && tsx tests/approved-apps.test.ts && tsx tests/installed-apps-e2e.test.ts",
+    "compile:electron": "tsc -p tsconfig.electron.json && npm run copy:voice-assets",
+    "copy:voice-assets": "node -e \"const fs=require('fs'),path=require('path');const src=path.join('electron','voice'),dst=path.join('dist-electron','voice');if(!fs.existsSync(dst))fs.mkdirSync(dst,{recursive:true});for(const f of ['hey_alfred.tflite','tts_worker.ps1','wake_word_server.py','whisper_server.py']){const s=path.join(src,f),d=path.join(dst,f);if(fs.existsSync(s))fs.copyFileSync(s,d);}\"",
+    "electron": "tsc -p tsconfig.electron.json && npm run copy:voice-assets && electron .",
     "desktop": "concurrently \"npm run dev\" \"wait-on http://localhost:3000 && npm run electron\"",
     "build": "next build && npm run compile:electron",
+    "pack:dir": "electron-builder --dir",
+    "pack:installer": "electron-builder --win nsis",
     "dist": "npm run build && electron-builder"
   },
   "dependencies": {
@@ -43,6 +47,7 @@
   "build": {
     "appId": "com.alfred.app",
     "productName": "ALFRED",
+    "artifactName": "${productName}-Setup-${version}.${ext}",
     "directories": {
       "output": "release"
     },
@@ -51,12 +56,49 @@
       "out/**/*",
       "package.json"
     ],
+    "asarUnpack": [
+      "dist-electron/voice/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "dist-electron/voice",
+        "to": "voice",
+        "filter": [
+          "*.py",
+          "*.ps1",
+          "*.tflite"
+        ]
+      }
+    ],
     "win": {
       "target": [
-        "nsis",
-        "portable"
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
-      "icon": "public/favicon.ico"
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "ALFRED",
+      "perMachine": false,
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": true
+    },
+    "portable": {
+      "artifactName": "${productName}-Portable-${version}.${ext}"
     }
   }
 }

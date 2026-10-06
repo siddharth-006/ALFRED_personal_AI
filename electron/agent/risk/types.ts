@@ -35,6 +35,8 @@ export interface RiskEvaluationResult {
     summary: string;
 }
 
+import { MemoryProposal } from "../memory/memory.types";
+
 export interface PendingConfirmation {
     /** Cryptographically stable or unique confirmation identifier */
     id: string;
@@ -48,6 +50,8 @@ export interface PendingConfirmation {
     context?: Record<string, unknown>;
     /** Execution options passed from command invocation */
     options?: ToolExecutionOptions;
+    /** Phase 5.7: Memory proposal awaiting explicit confirmation */
+    memoryProposal?: MemoryProposal;
     /** Timestamp when the pending confirmation was created */
     createdAt: number;
     /** Expiration timestamp (TTL) */

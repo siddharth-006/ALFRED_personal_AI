@@ -1,5 +1,6 @@
 import { IAgentPlanner, AgentPlan, AgentToolCall } from "./types";
 import { logger } from "../../utils/logger";
+import { recommendationAgentService } from "../recommendation/recommendation-agent.service";
 
 /**
  * Deterministic Mock Agent Planner (Phase 3.3 - Step 2)
@@ -121,19 +122,78 @@ export class MockAgentPlanner implements IAgentPlanner {
             };
         }
 
-        if (lower.includes("what should i work on") || lower.includes("pending tasks") || lower.includes("what tasks are pending")) {
-            let taskSummary = "No pending tasks found.";
-            if (context && Array.isArray(context.tasks)) {
+        if (lower.includes("how many tasks do i have") || lower.includes("how many tasks have i") || lower.includes("task count") || lower.includes("how many tasks")) {
+            let taskCountText = "You have 0 tasks.";
+            if (context?.agentContext && (context.agentContext as any).tasks?.summary) {
+                const s = (context.agentContext as any).tasks.summary;
+                taskCountText = `You have ${s.total} task(s) in total (${s.pending} pending, ${s.completed} completed).`;
+            } else if (context && Array.isArray(context.tasks)) {
+                const total = context.tasks.length;
+                const pending = context.tasks.filter((t: any) => !t.completed).length;
+                taskCountText = `You have ${total} task(s) in total (${pending} pending, ${total - pending} completed).`;
+            }
+            return {
+                userRequest: prompt,
+                explanation: "Reporting task count from agent context snapshot.",
+                type: "answer",
+                answerText: taskCountText,
+                toolCalls: [],
+            };
+        }
+
+        if (lower.includes("what's currently active") || lower.includes("what is currently active") || lower.includes("what is active") || lower === "active status") {
+            let activeDesc = "No focus session or projects currently active.";
+            const agentCtx = context?.agentContext as any;
+            if (agentCtx) {
+                const focusState = agentCtx.focus?.state || "idle";
+                const activeProjCount = agentCtx.projects?.summary?.active || 0;
+                const pendingTaskCount = agentCtx.tasks?.summary?.pending || 0;
+                activeDesc = `Focus is currently ${focusState}. You have ${activeProjCount} active project(s) and ${pendingTaskCount} pending task(s).`;
+            } else if (context) {
+                const pending = Array.isArray(context.tasks) ? context.tasks.filter((t: any) => !t.completed).length : 0;
+                activeDesc = `Focus is currently idle. You have ${pending} pending task(s).`;
+            }
+            return {
+                userRequest: prompt,
+                explanation: "Reporting active status from agent context snapshot.",
+                type: "answer",
+                answerText: activeDesc,
+                toolCalls: [],
+            };
+        }
+
+        // Phase 5.5B: Recommendation Agent Queries
+        if (
+            lower.includes("what should i work on") ||
+            lower.includes("what should i do next") ||
+            lower.includes("what should i focus on") ||
+            lower.includes("what to work on") ||
+            lower.includes("what to do next") ||
+            lower.includes("what are my priorities") ||
+            lower.includes("what is my priority") ||
+            lower.includes("give me something productive") ||
+            lower.includes("what can i work on") ||
+            lower.includes("i have some free time") ||
+            lower.includes("recommend something") ||
+            lower.includes("where should i start") ||
+            lower.includes("pending tasks") ||
+            lower.includes("what tasks are pending")
+        ) {
+            let answerText = "No pending tasks found.";
+            if (context?.agentContext) {
+                const recResult = recommendationAgentService.generateRecommendations(context.agentContext as any);
+                answerText = recommendationAgentService.formatConversationalExplanation(recResult);
+            } else if (context && Array.isArray(context.tasks)) {
                 const pending = context.tasks.filter((t: any) => !t.completed);
                 if (pending.length > 0) {
-                    taskSummary = `You have ${pending.length} pending task(s): ${pending.map((t: any) => `"${t.text}"`).join(", ")}.`;
+                    answerText = `Based on your ALFRED context: You have ${pending.length} pending task(s): ${pending.map((t: any) => `"${t.text}"`).join(", ")}.`;
                 }
             }
             return {
                 userRequest: prompt,
-                explanation: "Informational answer using application context.",
+                explanation: "Factual recommendation based on current ALFRED state snapshot.",
                 type: "answer",
-                answerText: `Based on your ALFRED context: ${taskSummary}`,
+                answerText,
                 toolCalls: [],
             };
         }
@@ -191,6 +251,176 @@ export class MockAgentPlanner implements IAgentPlanner {
                     { tool: "create_task", arguments: { text: taskText } },
                     { tool: "create_goal", arguments: { title: goalTitle, target: 10 } },
                 ],
+            };
+        }
+
+        // Phase 5.6 & 5.7: Agentic Multi-Step Planning Scenarios (Context- & Memory-Aware)
+        const agentCtx = (context?.agentContext as any);
+        const isFocusRunning = agentCtx?.focus?.state === "running" || (context?.focus as any)?.state === "running";
+
+        // Phase 5.7: Memory-aware preferences
+        const relevantMems: any[] = agentCtx?.memory?.relevant || [];
+        const wsMemory = relevantMems.find((m) =>
+            m.category === "WORKSPACE_PREFERENCE" || (typeof m.content === "string" && m.content.toLowerCase().includes("workspace"))
+        );
+        const preferredWs = wsMemory?.content.toLowerCase().includes("dsa")
+            ? "DSA"
+            : wsMemory?.content.toLowerCase().includes("machine learning")
+            ? "Machine Learning"
+            : undefined;
+
+        // Hierarchy rule 1: Explicit current user request overrides memory
+        // Hierarchy rule 2: Current factual state overrides memory
+        // Hierarchy rule 3: Relevant long-term memory used when no explicit entity specified
+        if (
+            (lower.includes("prepare") || lower.includes("set me up") || lower.includes("help me get ready") || lower.includes("ready for")) &&
+            (lower.includes("coding") || lower.includes("code session") || lower.includes("usual coding setup"))
+        ) {
+            let targetWs = "DSA";
+            let usedMemory = false;
+
+            if (lower.includes("machine learning") || lower.includes("ml")) {
+                targetWs = "Machine Learning"; // Explicit request overrides memory
+            } else if (lower.includes("data science")) {
+                targetWs = "Data Science";
+            } else if (preferredWs) {
+                targetWs = preferredWs;
+                usedMemory = true;
+            }
+
+            // Check factual state: if workspace is explicitly unavailable, do not pretend it exists
+            const wsSummary = agentCtx?.workspaces;
+            if (wsSummary && Array.isArray(wsSummary.items) && wsSummary.items.length > 0) {
+                const found = wsSummary.items.some((w: any) => (w.name || "").toLowerCase() === targetWs.toLowerCase());
+                if (!found) {
+                    return {
+                        userRequest: prompt,
+                        explanation: `The workspace "${targetWs}" is currently unavailable in your configuration.`,
+                        type: "answer",
+                        answerText: `The workspace "${targetWs}" is not currently available.`,
+                        toolCalls: [],
+                    };
+                }
+            }
+
+            const steps: AgentToolCall[] = [
+                { tool: "launch_application", arguments: { appName: "VS Code" } },
+                { tool: "launch_workspace", arguments: { workspaceName: targetWs } },
+                { tool: "show_tasks", arguments: { filter: targetWs } },
+            ];
+            if (!isFocusRunning) {
+                steps.push({ tool: "start_deep_work", arguments: { sessionName: `${targetWs} Coding` } });
+            }
+
+            const explanation = usedMemory
+                ? `I'll use your preferred ${targetWs} workspace for coding.`
+                : `Preparing coding session: launching tools, ${targetWs} workspace, task review${!isFocusRunning ? ", and focus timer" : ""}.`;
+
+            return {
+                userRequest: prompt,
+                explanation,
+                type: "action",
+                toolCalls: steps,
+            };
+        }
+
+        // Explicit duration override test: "Start a 25-minute session"
+        if (lower.includes("start a 25-minute") || lower.includes("start a 25 minute") || lower === "start a 25-minute session") {
+            return {
+                userRequest: prompt,
+                explanation: "Starting a 25-minute focus session per your explicit request.",
+                type: "action",
+                toolCalls: [
+                    { tool: "start_deep_work", arguments: { sessionName: "Focused Sprint", durationMinutes: 25 } }
+                ],
+            };
+        }
+
+        // 2. Machine Learning session objective
+        if (
+            (lower.includes("prepare") || lower.includes("set up") || lower.includes("set me up")) &&
+            (lower.includes("machine learning") || lower.includes("ml session") || lower.includes("ml study") || lower.includes("workspace for machine learning"))
+        ) {
+            const steps: AgentToolCall[] = [
+                { tool: "launch_workspace", arguments: { workspaceName: "Machine Learning" } },
+                { tool: "launch_application", arguments: { appName: "VS Code" } },
+                { tool: "show_tasks", arguments: { filter: "Machine Learning" } },
+            ];
+            if (!isFocusRunning) {
+                steps.push({ tool: "start_deep_work", arguments: { sessionName: "Machine Learning", durationMinutes: 45 } });
+            }
+            return {
+                userRequest: prompt,
+                explanation: `Preparing Machine Learning session: opening workspace, VS Code, ML tasks${!isFocusRunning ? ", and 45-minute focus session" : ""}.`,
+                type: "action",
+                toolCalls: steps,
+            };
+        }
+
+        // 3. Task organization objective
+        if (
+            lower.includes("organize my tasks") ||
+            lower.includes("organize my work") ||
+            lower.includes("plan my study session") ||
+            lower.includes("plan this for me")
+        ) {
+            const steps: AgentToolCall[] = [
+                { tool: "show_tasks", arguments: {} },
+                { tool: "navigate", arguments: { target: "missions" } },
+            ];
+            if (!isFocusRunning) {
+                steps.push({ tool: "start_deep_work", arguments: { sessionName: "Daily Focus" } });
+            }
+            return {
+                userRequest: prompt,
+                explanation: "Organizing daily tasks and missions with deep focus session.",
+                type: "action",
+                toolCalls: steps,
+            };
+        }
+
+        // 4. Hackathon objective
+        if (
+            lower.includes("hackathon") &&
+            (lower.includes("prepare") || lower.includes("get me ready") || lower.includes("everything i need"))
+        ) {
+            const steps: AgentToolCall[] = [
+                { tool: "launch_workspace", arguments: { workspaceName: "Hackathon" } },
+                { tool: "launch_application", arguments: { appName: "Chrome" } },
+                { tool: "show_tasks", arguments: { filter: "Hackathon" } },
+            ];
+            if (!isFocusRunning) {
+                steps.push({ tool: "start_deep_work", arguments: { sessionName: "Hackathon Sprint" } });
+            }
+            return {
+                userRequest: prompt,
+                explanation: "Setting up Hackathon environment: workspace, browser, tasks, and sprint timer.",
+                type: "action",
+                toolCalls: steps,
+            };
+        }
+
+        // 5. Follow-up from recommendation: "prepare everything for that"
+        if (
+            lower.includes("prepare everything for that") ||
+            lower.includes("prepare for that") ||
+            lower.includes("set up for that") ||
+            lower === "prepare that"
+        ) {
+            const lastTurn = history.length > 0 ? history[history.length - 1] : undefined;
+            const targetName = lastTurn?.targetEntity?.name || "Machine Learning";
+            const steps: AgentToolCall[] = [
+                { tool: "launch_workspace", arguments: { workspaceName: targetName } },
+                { tool: "show_tasks", arguments: { filter: targetName } },
+            ];
+            if (!isFocusRunning) {
+                steps.push({ tool: "start_deep_work", arguments: { sessionName: targetName } });
+            }
+            return {
+                userRequest: prompt,
+                explanation: `Preparing environment based on recent recommendation: ${targetName}.`,
+                type: "action",
+                toolCalls: steps,
             };
         }
 

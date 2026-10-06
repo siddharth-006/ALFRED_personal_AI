@@ -118,7 +118,7 @@ async function runUnifiedCommandTests() {
     // ===========================================================================
     {
         providerConfigService.reset();
-        providerConfigService.updateProviderConfig("gemini", { apiKey: "AIzaSyTestFakeApiKey", enabled: true });
+        providerConfigService.updateProviderConfig("gemini", { apiKey: "TEST_GEMINI_API_KEY", enabled: true });
         providerConfigService.setActiveProviderId("gemini");
 
         const geminiResponseBody = JSON.stringify({
@@ -246,9 +246,9 @@ async function runUnifiedCommandTests() {
         assert(
             Boolean(
                 res.success === true &&
-                    res.intent === "launch_application" &&
-                    res.appName?.includes("VS Code") &&
-                    res.appName?.includes("Chrome")
+                res.intent === "launch_application" &&
+                res.appName?.includes("VS Code") &&
+                res.appName?.includes("Chrome")
             ),
             "6. Multi-tool plan ('Open VS Code and Chrome') executes both tools via ToolRegistry",
             `AppNames aggregated: ${res.appName}`

@@ -33,7 +33,9 @@ export class ProviderAgentPlanner implements IAgentPlanner {
         logger.info(`ProviderAgentPlanner: Delegating plan generation for -> "${userRequest}"`);
 
         try {
-            const provider = this.providerRegistry.getActiveProvider();
+            const provider =
+                (context?.isMock ? this.providerRegistry.getProvider("mock") : null) ||
+                this.providerRegistry.getActiveProvider();
             logger.info(`ProviderAgentPlanner: Using active provider '${provider.id}' (${provider.name})`);
 
             const availableTools = this.toolRegistry.list().map((t) => ({

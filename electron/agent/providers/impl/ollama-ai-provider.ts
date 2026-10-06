@@ -62,7 +62,7 @@ export class OllamaAIProvider implements IAIProvider {
         }
 
         return {
-            endpointUrl: this.clientConfig.endpointUrl || envConfig.endpointUrl || "http://localhost:11434",
+            endpointUrl: this.clientConfig.endpointUrl || envConfig.endpointUrl || "http://127.0.0.1:11434",
             modelName:   this.clientConfig.modelName   || envConfig.modelName   || "qwen3:latest",
             timeoutMs:   this.clientConfig.timeoutMs   ?? 60_000,
         };

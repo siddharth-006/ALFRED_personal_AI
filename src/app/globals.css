@@ -3,32 +3,69 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-orbitron: var(--font-orbitron);
-  --font-rajdhani: var(--font-rajdhani);
+  --font-sans: var(--font-inter);
+  --font-header: var(--font-rajdhani);
   --font-mono: var(--font-jetbrains-mono);
   --font-space: var(--font-space-grotesk);
+  --font-orbitron: var(--font-orbitron);
+  --font-rajdhani: var(--font-rajdhani);
 }
 
 :root {
-  --background: #020508;
-  --foreground: #DFF6FF;
-  --panel: #050A12;
-  --panel-border: rgba(0, 191, 255, 0.3);
-  --primary: #00BFFF;
-  --primary-foreground: #020508;
-  --glow: 0 0 10px rgba(0, 191, 255, 0.5), inset 0 0 10px rgba(0, 191, 255, 0.1);
-  --glow-strong: 0 0 20px rgba(0, 229, 255, 0.8), inset 0 0 15px rgba(0, 229, 255, 0.2);
+  /* Foundation: Near-black graphite with subtle blue-black depth */
+  --background: #080A0F;
+  --foreground: #E2E8F0;
+  --surface-panel: rgba(13, 16, 26, 0.78);
+  --surface-panel-solid: #0D101A;
+  --surface-card: rgba(18, 22, 34, 0.65);
+  --surface-card-hover: rgba(24, 29, 45, 0.85);
+
+  /* Thin Technical Borders */
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-medium: rgba(255, 255, 255, 0.14);
+  --border-panel: rgba(255, 255, 255, 0.08);
+
+  /* Primary Accent: Sophisticated ALFRED Crimson Red */
+  --primary: #E11D48;
+  --primary-hover: #F43F5E;
+  --primary-subtle: rgba(225, 29, 72, 0.12);
+  --primary-border: rgba(225, 29, 72, 0.40);
+  --glow-red: 0 0 14px rgba(225, 29, 72, 0.35);
+  --glow-red-strong: 0 0 24px rgba(225, 29, 72, 0.6);
+
+  /* Secondary Accent: Restrained Electric Cyan */
+  --secondary: #06B6D4;
+  --secondary-hover: #22D3EE;
+  --secondary-subtle: rgba(6, 182, 212, 0.10);
+  --secondary-border: rgba(6, 182, 212, 0.35);
+  --glow-cyan: 0 0 14px rgba(6, 182, 212, 0.30);
+  --glow-cyan-strong: 0 0 24px rgba(6, 182, 212, 0.55);
+
+  /* Semantic Status Colors */
+  --status-online: #10B981;
+  --status-warning: #F59E0B;
+  --status-error: #EF4444;
+  --status-processing: #06B6D4;
+  --status-disabled: #64748B;
+
+  /* Legacy aliases for backward compatibility */
+  --panel: var(--surface-panel);
+  --panel-border: var(--border-subtle);
+  --primary-foreground: #080A0F;
+  --glow: var(--glow-red);
+  --glow-strong: var(--glow-red-strong);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-rajdhani), sans-serif;
+  font-family: var(--font-inter), sans-serif;
   position: relative;
   overflow-x: hidden;
+  letter-spacing: -0.01em;
 }
 
-/* Global Holographic Grid Background */
+/* Cinematic Atmospheric Background Layer */
 body::before {
   content: "";
   position: fixed;
@@ -36,15 +73,18 @@ body::before {
   left: 0;
   width: 100vw;
   height: 100vh;
-  background-image: 
-    linear-gradient(rgba(0, 191, 255, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 191, 255, 0.05) 1px, transparent 1px);
-  background-size: 30px 30px;
-  z-index: -2;
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(225, 29, 72, 0.04), transparent),
+    radial-gradient(ellipse 60% 40% at 85% 15%, rgba(6, 182, 212, 0.03), transparent),
+    radial-gradient(ellipse 60% 40% at 15% 85%, rgba(225, 29, 72, 0.02), transparent),
+    linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 32px 32px, 32px 32px;
+  z-index: -1;
   pointer-events: none;
 }
 
-/* Global Scanlines */
+/* Subtle cinematic depth overlay (removed aggressive scanlines) */
 body::after {
   content: "";
   position: fixed;
@@ -52,119 +92,279 @@ body::after {
   left: 0;
   width: 100vw;
   height: 100vh;
-  background: linear-gradient(
-    to bottom,
-    rgba(255, 255, 255, 0),
-    rgba(255, 255, 255, 0) 50%,
-    rgba(0, 191, 255, 0.05) 50%,
-    rgba(0, 191, 255, 0.05)
-  );
-  background-size: 100% 4px;
-  z-index: 9999;
+  background: radial-gradient(circle at center, transparent 60%, rgba(0, 0, 0, 0.4) 100%);
+  z-index: 999;
   pointer-events: none;
-  opacity: 0.3;
+  opacity: 0.7;
 }
 
-/* Futuristic Scrollbar */
+/* Sleek Desktop Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #020508;
+  background: rgba(8, 10, 15, 0.8);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 191, 255, 0.4);
+  background: rgba(255, 255, 255, 0.16);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 191, 255, 0.8);
+  background: rgba(225, 29, 72, 0.5);
 }
 
-/* Base futuristic classes */
-.font-header {
-  font-family: var(--font-orbitron), sans-serif;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
+/* =========================================================================
+   ALFRED V2 DESIGN SYSTEM: PANELS & SURFACES (MATCHING VISUAL REFERENCE)
+   ========================================================================= */
 
-.font-data {
-  font-family: var(--font-jetbrains-mono), monospace;
-}
-
-.font-body {
-  font-family: var(--font-rajdhani), sans-serif;
-}
-
+.alfred-panel,
 .hud-panel {
-  background: rgba(5, 10, 18, 0.8);
-  border: 1px solid var(--panel-border);
-  box-shadow: inset 0 0 20px rgba(0, 191, 255, 0.05);
-  backdrop-filter: blur(10px);
+  background: rgba(10, 13, 20, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 12px 36px -6px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 14px;
   position: relative;
-  overflow: hidden;
+  transition: all 0.2s ease;
 }
 
-.hud-panel::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 10px;
-  height: 10px;
-  border-top: 2px solid var(--primary);
-  border-left: 2px solid var(--primary);
+.alfred-panel:hover {
+  border-color: rgba(255, 255, 255, 0.14);
 }
 
-.hud-panel::after {
-  content: "";
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  width: 10px;
-  height: 10px;
-  border-bottom: 2px solid var(--primary);
-  border-right: 2px solid var(--primary);
+.alfred-panel-accent-red {
+  border-color: rgba(225, 29, 72, 0.45);
+  box-shadow: 0 12px 36px -6px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(225, 29, 72, 0.25), 0 0 24px -4px rgba(225, 29, 72, 0.25);
+}
+
+.alfred-panel-accent-cyan {
+  border-color: rgba(6, 182, 212, 0.40);
+  box-shadow: 0 12px 36px -6px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(6, 182, 212, 0.2), 0 0 24px -4px rgba(6, 182, 212, 0.2);
+}
+
+.alfred-card {
+  background: rgba(16, 20, 30, 0.60);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 10px;
+  transition: all 0.2s ease;
+}
+
+.alfred-card:hover {
+  background: rgba(22, 28, 42, 0.80);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+/* =========================================================================
+   ALFRED V2 DESIGN SYSTEM: BUTTONS
+   ========================================================================= */
+
+.alfred-btn-primary {
+  background: #E11D48;
+  color: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  font-family: var(--font-space), sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 0.5rem 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: all 0.15s ease;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(225, 29, 72, 0.25);
+}
+
+.alfred-btn-primary:hover {
+  background: #F43F5E;
+  box-shadow: var(--glow-red);
+}
+
+.alfred-btn-secondary {
+  background: rgba(255, 255, 255, 0.04);
+  color: #E2E8F0;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 6px;
+  font-family: var(--font-space), sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  padding: 0.5rem 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.alfred-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #FFFFFF;
+}
+
+.alfred-btn-cyan {
+  background: rgba(6, 182, 212, 0.12);
+  color: #22D3EE;
+  border: 1px solid rgba(6, 182, 212, 0.35);
+  border-radius: 6px;
+  font-family: var(--font-space), sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 0.5rem 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.alfred-btn-cyan:hover {
+  background: rgba(6, 182, 212, 0.22);
+  border-color: #22D3EE;
+  box-shadow: var(--glow-cyan);
 }
 
 .hud-button {
-  background: rgba(0, 191, 255, 0.1);
-  border: 1px solid rgba(0, 191, 255, 0.5);
-  color: var(--primary);
-  font-family: var(--font-orbitron), sans-serif;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  transition: all 0.3s ease;
-  position: relative;
-  overflow: hidden;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #E2E8F0;
+  font-family: var(--font-space), sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  border-radius: 6px;
+  padding: 0.45rem 0.9rem;
+  transition: all 0.15s ease;
+  cursor: pointer;
 }
 
 .hud-button:hover {
-  background: rgba(0, 191, 255, 0.3);
-  box-shadow: var(--glow);
-  text-shadow: 0 0 5px var(--primary);
+  background: rgba(225, 29, 72, 0.15);
+  border-color: var(--primary-border);
+  color: #FFFFFF;
+  box-shadow: var(--glow-red);
+}
+
+/* =========================================================================
+   ALFRED V2 DESIGN SYSTEM: INPUTS
+   ========================================================================= */
+
+.alfred-input {
+  background: #0B0E17;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 6px;
+  color: #F8FAFC;
+  padding: 0.5rem 0.85rem;
+  font-family: var(--font-inter), sans-serif;
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.alfred-input::placeholder {
+  color: #64748B;
+}
+
+.alfred-input:focus {
+  border-color: rgba(225, 29, 72, 0.6);
+  box-shadow: 0 0 0 2px rgba(225, 29, 72, 0.15);
+}
+
+/* =========================================================================
+   ALFRED V2 DESIGN SYSTEM: TYPOGRAPHY
+   ========================================================================= */
+
+.font-header {
+  font-family: var(--font-space), var(--font-inter), sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.font-data {
+  font-family: var(--font-mono), monospace;
+  font-size: 0.8125rem;
+}
+
+.font-body {
+  font-family: var(--font-sans), var(--font-inter), sans-serif;
 }
 
 .text-glow {
-  text-shadow: 0 0 8px rgba(0, 191, 255, 0.6);
+  text-shadow: 0 0 8px rgba(225, 29, 72, 0.4);
+}
+
+.text-glow-cyan {
+  text-shadow: 0 0 8px rgba(6, 182, 212, 0.4);
 }
 
 .text-glow-strong {
-  text-shadow: 0 0 15px rgba(0, 229, 255, 0.9);
+  text-shadow: 0 0 16px rgba(225, 29, 72, 0.7);
 }
 
-/* CRT Flicker animation */
-@keyframes flicker {
-  0% { opacity: 0.9; }
-  5% { opacity: 0.8; }
-  10% { opacity: 1; }
-  15% { opacity: 0.9; }
-  100% { opacity: 1; }
+/* =========================================================================
+   STATUS INDICATORS & SYSTEM SIGNALS
+   ========================================================================= */
+
+.status-dot-online {
+  width: 7px;
+  height: 7px;
+  border-radius: 9999px;
+  background-color: var(--status-online);
+  box-shadow: 0 0 8px var(--status-online);
 }
 
-.animate-flicker {
-  animation: flicker 0.15s infinite alternate;
+.status-dot-active {
+  width: 7px;
+  height: 7px;
+  border-radius: 9999px;
+  background-color: var(--primary);
+  box-shadow: 0 0 8px var(--primary);
+}
+
+.status-dot-cyan {
+  width: 7px;
+  height: 7px;
+  border-radius: 9999px;
+  background-color: var(--secondary);
+  box-shadow: 0 0 8px var(--secondary);
+}
+
+.status-dot-warning {
+  width: 7px;
+  height: 7px;
+  border-radius: 9999px;
+  background-color: var(--status-warning);
+  box-shadow: 0 0 8px var(--status-warning);
+}
+
+.status-dot-error {
+  width: 7px;
+  height: 7px;
+  border-radius: 9999px;
+  background-color: var(--status-error);
+  box-shadow: 0 0 8px var(--status-error);
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 4px;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }

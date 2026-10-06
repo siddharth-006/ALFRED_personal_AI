@@ -1,5 +1,6 @@
 import { getMainWindow } from "../windows/main-window";
 import { logger } from "../utils/logger";
+import { eventBus } from "../events/event-bus";
 
 export type GoalType = "Weekly" | "Monthly";
 
@@ -128,6 +129,16 @@ export class GoalService {
         ];
 
         logger.info(`GoalService: Updated goal '${updatedGoal.title}' (ID: ${updatedGoal.id})`);
+
+        eventBus.publish("goal_progress_changed", {
+            goalId: updatedGoal.id,
+            title: updatedGoal.title,
+            type: updatedGoal.type,
+            current: updatedGoal.current,
+            target: updatedGoal.target,
+            completed: updatedGoal.completed,
+        });
+
         this.broadcastChanges();
 
         return {

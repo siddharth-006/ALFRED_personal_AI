@@ -1,5 +1,6 @@
 import { getMainWindow } from "../windows/main-window";
 import { logger } from "../utils/logger";
+import { eventBus } from "../events/event-bus";
 
 export type ProjectCategory = "DSA" | "Data Science" | "College" | "Hackathon" | "Personal";
 export type ProjectStatus = "Not Started" | "In Progress" | "Completed";
@@ -152,6 +153,15 @@ export class ProjectService {
         ];
 
         logger.info(`ProjectService: Updated project '${updatedProject.name}' (ID: ${updatedProject.id}, progress: ${updatedProject.progress}%, status: ${updatedProject.status})`);
+
+        eventBus.publish("project_activity", {
+            projectId: updatedProject.id,
+            name: updatedProject.name,
+            category: updatedProject.category,
+            progress: updatedProject.progress,
+            status: updatedProject.status,
+        });
+
         this.broadcastChanges();
 
         return {

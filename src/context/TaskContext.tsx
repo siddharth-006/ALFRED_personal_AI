@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { updateStreak } from '../utils/streakUtils';
+import { AlfredAudioService } from '@/utils/audioSystem';
 
 export type TaskCategory = string;
 
@@ -10,6 +11,7 @@ export interface Task {
   text: string;
   completed: boolean;
   category: TaskCategory;
+  completedAt?: number;
 }
 
 interface TaskContextType {
@@ -93,8 +95,23 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
         const newCompleted = !task.completed;
         if (newCompleted) {
           updateStreak();
+          AlfredAudioService.play("taskComplete");
+          if (typeof window !== "undefined") {
+            import("@/utils/activityBus").then(({ dispatchAlfredActivity }) => {
+              dispatchAlfredActivity({
+                type: "task_completed",
+                state: "success",
+                label: "TASK COMPLETED",
+                detail: task.text,
+              });
+            });
+          }
         }
-        return { ...task, completed: newCompleted };
+        return {
+          ...task,
+          completed: newCompleted,
+          completedAt: newCompleted ? (task.completedAt || Date.now()) : undefined,
+        };
       }
       return task;
     }));

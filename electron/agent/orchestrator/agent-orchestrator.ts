@@ -160,8 +160,17 @@ export function applySafeDependencyContext(
     // Tool-specific safe argument derivation
     switch (tool) {
         case "start_deep_work": {
+            if (!args.workspace) {
+                if (merged.workspaceId) {
+                    args.workspace = merged.workspaceId;
+                } else if (merged.type === "workspace" && merged.name) {
+                    args.workspace = merged.name;
+                }
+            }
             if (!args.sessionName || args.sessionName === "" || args.sessionName === "focus" || args.sessionName === "dsa") {
-                if (merged.name) {
+                if (args.workspace) {
+                    args.sessionName = String(args.workspace);
+                } else if (merged.name) {
                     args.sessionName = merged.name;
                 } else if (merged.workspaceId) {
                     args.sessionName = merged.workspaceId;

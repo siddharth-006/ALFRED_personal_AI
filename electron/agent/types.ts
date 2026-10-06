@@ -18,7 +18,22 @@ export type CommandIntent =
     | "update_goal"
     | "update_project"
     | "answer"
+    | "recommendation"
     | "pending_confirmation"
+    | "agentic_plan"
+    | "routine"
+    | "briefing"
+    | "review"
+    | "weekly_review"
+    | "weekly_planning"
+    | "schedule"
+    | "automation"
+    | "knowledge_search"
+    | "knowledge_import"
+    | "desktop_context"
+    | "settings"
+    | "memory_proposal"
+    | "memory_confirmed"
     | "cancelled"
     | "unknown";
 
@@ -37,6 +52,16 @@ export interface ResolvedCommandAction {
 
 import { AgentPlan, AgentToolCallResult } from "./orchestrator/types";
 import { RiskEvaluationResult } from "./risk/types";
+import { RecommendationResult, RecommendationItem } from "./recommendation/recommendation.types";
+import { AgenticPlan } from "./planning/agentic-plan.types";
+import { AgentContextSnapshot } from "./agent-context/agent-context.types";
+import { MemoryProposal, MemoryItem } from "./memory/memory.types";
+import { Routine } from "./routines/routine.types";
+import { MorningBriefing } from "./briefing/briefing.types";
+import { EndOfDayReview } from "./review/review.types";
+import { WeeklyReview, WeeklyPlanProposal } from "./review/weekly-review.types";
+import { ScheduledRoutine } from "./scheduler/scheduler.types";
+import { AutomationRule } from "./automation/automation.types";
 
 export interface CommandExecutionResult {
     success: boolean;
@@ -54,6 +79,9 @@ export interface CommandExecutionResult {
     task?: unknown;
     goal?: unknown;
     project?: unknown;
+    /** Phase 5.5B: Grounded recommendations if query was advisory */
+    recommendations?: RecommendationItem[];
+    recommendationResult?: RecommendationResult;
     /** Sequence of step-by-step execution results for multi-step plans */
     steps?: AgentToolCallResult[];
     totalSteps?: number;
@@ -61,12 +89,44 @@ export interface CommandExecutionResult {
     /** Number of steps skipped due to failed prerequisites (Phase 4.15) */
     skippedSteps?: number;
     plan?: AgentPlan;
-    /** Whether execution is paused awaiting user confirmation (Phase 4.16) */
+    /** Phase 5.6: Strongly-typed agentic multi-step execution plan */
+    agenticPlan?: AgenticPlan;
+    /** Phase 5.6 & 5.7: Fresh context snapshot captured post-execution */
+    agentSnapshot?: AgentContextSnapshot;
+    /** Phase 5.8A: Routine definition if triggered via daily routine */
+    routine?: Routine;
+    /** Phase 5.8B: Read-only morning briefing overview */
+    briefing?: MorningBriefing;
+    /** Phase 5.8D: Read-only end-of-day review */
+    review?: EndOfDayReview;
+    /** Phase 5.10: Read-only weekly review */
+    weeklyReview?: WeeklyReview;
+    /** Phase 5.10: Weekly planning proposal */
+    weeklyPlan?: WeeklyPlanProposal;
+    /** Phase 5.10: Single schedule item */
+    schedule?: ScheduledRoutine;
+    /** Phase 5.10: List of schedules */
+    schedules?: ScheduledRoutine[];
+    /** Phase 5.10: Single automation rule */
+    automation?: AutomationRule;
+    /** Phase 5.10: List of automation rules */
+    automations?: AutomationRule[];
+    /** Phase 5.7: Memory proposal awaiting explicit confirmation */
+    memoryProposal?: MemoryProposal;
+    memoryAction?: "remember" | "forget" | "update";
+    memoryItem?: MemoryItem;
+    spokenPrompt?: string;
+    /** Whether execution is paused awaiting user confirmation (Phase 4.16 & Phase 5.6) */
     requiresConfirmation?: boolean;
     /** Stable identifier of the pending confirmation session */
     confirmationId?: string;
     /** Deterministic risk assessment of the proposed plan */
     risk?: RiskEvaluationResult;
+    /** Phase 6.1: Knowledge RAG search results & citations */
+    knowledgeResults?: import("../knowledge/knowledge.types").KnowledgeSearchResult[];
+    knowledgeDocument?: import("../knowledge/knowledge.types").KnowledgeDocument;
+    /** Phase 6.1: Safe desktop context telemetry */
+    desktopContext?: import("../services/desktop-context.types").SafeDesktopContext;
     /** Whether the action was explicitly cancelled by the user */
     cancelled?: boolean;
     /** Whether the action was explicitly confirmed and authorized by the user (Phase 4.16) */

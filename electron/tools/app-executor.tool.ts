@@ -3,10 +3,14 @@ import fs from "fs";
 import path from "path";
 import { logger } from "../utils/logger";
 import { APP_DISPLAY_NAMES } from "./app-resolver.tool";
+import { approvedAppsService } from "../services/approved-apps.service";
 
 export interface AppExecutionOptions {
     isMock?: boolean;
     context?: Record<string, unknown>;
+    appId?: string;
+    arguments?: string[];
+    workingDirectory?: string;
 }
 
 export interface AppExecutionResult {
@@ -156,8 +160,8 @@ export class AppExecutorTool {
     /**
      * Spawns a whitelisted application executable safely as a detached process.
      *
-     * @param executable Whitelisted executable key (e.g. "code", "chrome", "wt", "discord", "spotify")
-     * @param options Execution options (supports mock execution for unit tests)
+     * @param executable Whitelisted executable key or path
+     * @param options Execution options (supports mock execution, custom arguments, workingDirectory)
      */
     public async execute(
         executable: string,
@@ -172,7 +176,69 @@ export class AppExecutorTool {
             };
         }
 
-        logger.info(`AppExecutorTool: Resolving executable target: '${executable}'`);
+        logger.info(`AppExecutorTool: Resolving executable target: '${executable}' (appId: ${options.appId || "none"})`);
+
+        // Check if executable target corresponds to an approved application
+        let approvedApp = options.appId ? approvedAppsService.getApprovedAppById(options.appId) : null;
+        if (!approvedApp) {
+            approvedApp = approvedAppsService.findApprovedApp(executable);
+        }
+
+        if (approvedApp && !approvedApp.isBuiltIn) {
+            if (fileExists(approvedApp.executablePath)) {
+                const effectiveArgs = options.arguments ?? approvedApp.arguments ?? [];
+                const effectiveCwd = options.workingDirectory ?? approvedApp.workingDirectory;
+                logger.info(
+                    `AppExecutorTool: Executing approved application '${approvedApp.name}' [id: ${approvedApp.id}, exe: ${approvedApp.executablePath}, argsCount: ${effectiveArgs.length}]`
+                );
+                return this.spawnBinary(
+                    approvedApp.executablePath,
+                    approvedApp.name,
+                    effectiveArgs,
+                    effectiveCwd
+                );
+            } else {
+                return {
+                    success: false,
+                    executable,
+                    executed: false,
+                    error: `Approved application '${approvedApp.name}' executable could not be found at '${approvedApp.executablePath}'.`,
+                };
+            }
+        }
+
+        // Direct executable path check if it's already an absolute path
+        if (path.isAbsolute(executable) && fileExists(executable)) {
+            const matchedApp = approvedApp || approvedAppsService.findApprovedApp(executable);
+            if (matchedApp) {
+                const effectiveArgs = options.arguments ?? matchedApp.arguments ?? [];
+                const effectiveCwd = options.workingDirectory ?? matchedApp.workingDirectory;
+                logger.info(
+                    `AppExecutorTool: Found verified approved direct path for '${matchedApp.name}' at '${executable}'`
+                );
+                return this.spawnBinary(
+                    executable,
+                    matchedApp.name || path.basename(executable, ".exe"),
+                    effectiveArgs,
+                    effectiveCwd
+                );
+            } else if (approvedAppsService.isApplicationApproved(executable)) {
+                logger.info(`AppExecutorTool: Found verified approved direct path at '${executable}'`);
+                return this.spawnBinary(
+                    executable,
+                    path.basename(executable, ".exe"),
+                    options.arguments || [],
+                    options.workingDirectory
+                );
+            } else {
+                return {
+                    success: false,
+                    executable,
+                    executed: false,
+                    error: `Application binary at '${executable}' is not approved by ALFRED.`,
+                };
+            }
+        }
 
         // 1. Check known dynamic Windows installation paths for the whitelisted executable key
         const candidatePaths = getCandidateExecutablePaths(executable);
@@ -180,14 +246,24 @@ export class AppExecutorTool {
 
         if (resolvedPath) {
             logger.info(`AppExecutorTool: Found verified application binary at '${resolvedPath}'`);
-            return this.spawnBinary(resolvedPath, executable);
+            return this.spawnBinary(
+                resolvedPath,
+                executable,
+                options.arguments || [],
+                options.workingDirectory
+            );
         }
 
         // 2. Safe PATH inspection (no shell execution)
         const pathBinary = findOnPath(executable);
         if (pathBinary) {
             logger.info(`AppExecutorTool: Found verified application binary on PATH at '${pathBinary}'`);
-            return this.spawnBinary(pathBinary, executable);
+            return this.spawnBinary(
+                pathBinary,
+                executable,
+                options.arguments || [],
+                options.workingDirectory
+            );
         }
 
         // 3. Application not installed on this system — return clean error without shell fallback
@@ -205,15 +281,34 @@ export class AppExecutorTool {
 
     /**
      * Spawns verified native binary directly with shell: false.
+     * Passes validated arguments and working directory if provided.
      */
-    private spawnBinary(binaryPath: string, originalExecutableKey: string): Promise<AppExecutionResult> {
+    private spawnBinary(
+        binaryPath: string,
+        originalExecutableKey: string,
+        args: string[] = [],
+        cwd?: string
+    ): Promise<AppExecutionResult> {
         return new Promise((resolve) => {
             try {
-                const child = spawn(binaryPath, [], {
+                // Secondary security sanitization of arguments
+                const safeArgs = args.filter((a) => typeof a === "string" && !/[;&|`$<>\n\r]/.test(a));
+
+                const spawnOptions: import("child_process").SpawnOptions = {
                     detached: true,
                     stdio: "ignore",
                     shell: false,
-                });
+                };
+
+                if (cwd && typeof cwd === "string" && fileExists(cwd)) {
+                    spawnOptions.cwd = cwd;
+                }
+
+                logger.info(
+                    `AppExecutorTool: Spawning '${binaryPath}' with args [${safeArgs.join(", ")}] and cwd: ${spawnOptions.cwd || "default"}`
+                );
+
+                const child = spawn(binaryPath, safeArgs, spawnOptions);
 
                 let errorOccurred = false;
 

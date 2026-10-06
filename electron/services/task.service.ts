@@ -1,11 +1,16 @@
 import { getMainWindow } from "../windows/main-window";
 import { logger } from "../utils/logger";
+import { eventBus } from "../events/event-bus";
 
 export interface Task {
     id: string;
     text: string;
     completed: boolean;
     category: string;
+    completedAt?: number;
+    dueDate?: string;
+    priority?: "low" | "medium" | "high";
+    createdDate?: string;
 }
 
 const DEFAULT_INITIAL_TASKS: Task[] = [
@@ -47,8 +52,24 @@ export class TaskService {
                 text: String(t.text || "").trim(),
                 completed: Boolean(t.completed),
                 category: String(t.category || "Personal").trim(),
+                completedAt: typeof t.completedAt === "number" ? t.completedAt : undefined,
+                dueDate: t.dueDate ? String(t.dueDate).trim() : undefined,
+                priority: t.priority === "high" || t.priority === "medium" || t.priority === "low" ? t.priority : undefined,
+                createdDate: t.createdDate ? String(t.createdDate).trim() : undefined,
             }));
             logger.info(`TaskService: Synced ${this.tasks.length} task(s) from renderer.`);
+            const todayStr = new Date().toISOString().split("T")[0];
+            for (const task of this.tasks) {
+                if (!task.completed && task.dueDate && task.dueDate < todayStr) {
+                    eventBus.publish("task_became_overdue", {
+                        taskId: task.id,
+                        text: task.text,
+                        category: task.category,
+                        priority: task.priority,
+                        dueDate: task.dueDate,
+                    });
+                }
+            }
         }
     }
 
@@ -62,10 +83,19 @@ export class TaskService {
             text: trimmedText,
             completed: false,
             category: (category && category.trim()) || "Personal",
+            createdDate: new Date().toISOString().split("T")[0],
         };
 
         this.tasks = [newTask, ...this.tasks];
         logger.info(`TaskService: Created task '${newTask.text}' (ID: ${newTask.id})`);
+
+        eventBus.publish("task_created", {
+            taskId: newTask.id,
+            text: newTask.text,
+            category: newTask.category,
+            priority: newTask.priority,
+            dueDate: newTask.dueDate,
+        });
 
         this.broadcastChanges();
         return { ...newTask };
@@ -86,7 +116,11 @@ export class TaskService {
             };
         }
 
-        const updatedTask = { ...this.tasks[index], completed: true };
+        const updatedTask = {
+            ...this.tasks[index],
+            completed: true,
+            completedAt: this.tasks[index].completedAt || Date.now(),
+        };
         this.tasks = [
             ...this.tasks.slice(0, index),
             updatedTask,
@@ -94,6 +128,16 @@ export class TaskService {
         ];
 
         logger.info(`TaskService: Completed task '${updatedTask.text}' (ID: ${updatedTask.id})`);
+
+        eventBus.publish("task_completed", {
+            taskId: updatedTask.id,
+            text: updatedTask.text,
+            category: updatedTask.category,
+            priority: updatedTask.priority,
+            dueDate: updatedTask.dueDate,
+            completedAt: updatedTask.completedAt,
+        });
+
         this.broadcastChanges();
 
         return {

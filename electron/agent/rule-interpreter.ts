@@ -15,7 +15,7 @@ import { ICommandInterpreter, StructuredAction } from "./types";
 /**
  * Shell metacharacters and dangerous tokens that immediately invalidate input.
  */
-const SHELL_METACHARACTERS_REGEX = /[;&|`$()<>{}\\\n\r]/;
+const SHELL_METACHARACTERS_REGEX = /[;&|`$<>{}\\\n\r]/;
 
 /**
  * Dangerous shell keywords to reject for security.
@@ -158,15 +158,34 @@ export class RuleCommandInterpreter implements ICommandInterpreter {
 
         // 3. TASK INFORMATION INTENT (Read-Only Queries)
         if (
+            lowerCleaned === "show tasks" ||
+            lowerCleaned === "show my tasks" ||
             lowerCleaned === "show today's tasks" ||
             lowerCleaned === "show todays tasks" ||
             lowerCleaned === "what are my pending tasks" ||
             lowerCleaned === "what do i need to do today" ||
             lowerCleaned === "pending tasks" ||
-            lowerCleaned === "today's tasks" ||
-            lowerCleaned === "show my tasks"
+            lowerCleaned === "today's tasks"
         ) {
             return { intent: "show_tasks", target: null };
+        }
+
+        // 3.5. RECOMMENDATION ADVISORY INTENT (Read-Only Queries)
+        if (
+            lowerCleaned === "what should i work on" ||
+            lowerCleaned === "what should i work on now" ||
+            lowerCleaned === "what should i do next" ||
+            lowerCleaned === "what should i focus on" ||
+            lowerCleaned === "what should i focus on today" ||
+            lowerCleaned === "what to work on" ||
+            lowerCleaned === "what to do next" ||
+            lowerCleaned === "what are my priorities" ||
+            lowerCleaned === "what is my priority" ||
+            lowerCleaned === "give me something productive to work on" ||
+            lowerCleaned === "i have some free time what should i work on" ||
+            lowerCleaned === "recommend something"
+        ) {
+            return { intent: "recommendation", target: null };
         }
 
         // 4. WORKSPACE LAUNCH INTENT
@@ -258,6 +277,18 @@ export class RuleCommandInterpreter implements ICommandInterpreter {
                         target: HUMAN_APP_NAMES[lowerTarget],
                     };
                 }
+
+                // Check approved application registry for custom/discovered approved applications
+                try {
+                    const { approvedAppsService } = require("../services/approved-apps.service");
+                    const approved = approvedAppsService.findApprovedApp(rawTarget);
+                    if (approved) {
+                        return {
+                            intent: "launch_application",
+                            target: approved.name,
+                        };
+                    }
+                } catch {}
             }
         }
 

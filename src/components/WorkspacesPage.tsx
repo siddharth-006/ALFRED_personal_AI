@@ -1,34 +1,69 @@
 "use client";
 
 import React, { useState } from "react";
-import { 
-  Briefcase, Code, LineChart, Terminal, Brain, 
-  Plus, Play, X, Trash2, Edit2, Globe, Monitor, 
-  Folder as FolderIcon, LayoutGrid, BarChart2 
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Briefcase,
+  Code,
+  LineChart,
+  Terminal,
+  Brain,
+  Plus,
+  Play,
+  X,
+  Trash2,
+  Edit2,
+  Globe,
+  Monitor,
+  Folder as FolderIcon,
+  CheckCircle2,
+  Laptop,
 } from "lucide-react";
-import { useWorkspaces, Workspace, WorkspaceType } from "@/context/WorkspaceContext";
+import ApplicationPickerModal from "@/components/ApplicationPickerModal";
+import {
+  useWorkspaces,
+  Workspace,
+  WorkspaceType,
+} from "@/context/WorkspaceContext";
+import {
+  playClickSound,
+  playHoverSound,
+  playSuccessSound,
+  AlfredAudioService,
+} from "@/utils/audioSystem";
 
-export const getWorkspaceIcon = (type: WorkspaceType, size = 24) => {
+export const getWorkspaceIcon = (type: WorkspaceType, size = 20) => {
   switch (type) {
-    case "dsa": return <Code size={size} />;
-    case "datascience": return <LineChart size={size} />;
-    case "hackathon": return <Terminal size={size} />;
-    case "machinelearning": return <Brain size={size} />;
+    case "dsa":
+      return <Code size={size} />;
+    case "datascience":
+      return <LineChart size={size} />;
+    case "hackathon":
+      return <Terminal size={size} />;
+    case "machinelearning":
+      return <Brain size={size} />;
     case "custom":
-    default: return <Briefcase size={size} />;
+    default:
+      return <Briefcase size={size} />;
   }
 };
 
 export default function WorkspacesPage() {
-  const { workspaces, addWorkspace, updateWorkspace, deleteWorkspace, launchWorkspace } = useWorkspaces();
+  const {
+    workspaces,
+    addWorkspace,
+    updateWorkspace,
+    deleteWorkspace,
+    launchWorkspace,
+  } = useWorkspaces();
 
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isLaunchModalOpen, setIsLaunchModalOpen] = useState(false);
-  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [isAppPickerOpen, setIsAppPickerOpen] = useState(false);
 
   const [activeWorkspace, setActiveWorkspace] = useState<Workspace | null>(null);
-  
+
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -41,10 +76,11 @@ export default function WorkspacesPage() {
   const [formInput, setFormInput] = useState({
     app: "",
     website: "",
-    folder: ""
+    folder: "",
   });
 
   const [launchMessage, setLaunchMessage] = useState("");
+  const [isLaunching, setIsLaunching] = useState(false);
 
   const totalWorkspaces = workspaces.length;
   const totalApps = workspaces.reduce((acc, ws) => acc + ws.applications.length, 0);
@@ -52,7 +88,9 @@ export default function WorkspacesPage() {
   const totalFolders = workspaces.reduce((acc, ws) => acc + ws.localFolders.length, 0);
 
   // Form Handlers
-  const openFormModal = (workspace?: Workspace) => {
+  const openFormModal = (workspace?: Workspace, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    playClickSound();
     if (workspace) {
       setActiveWorkspace(workspace);
       setFormData({
@@ -85,35 +123,48 @@ export default function WorkspacesPage() {
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim()) return alert("Name is required");
+    if (!formData.name.trim()) return;
 
     if (activeWorkspace) {
       updateWorkspace(activeWorkspace.id, formData);
+      playSuccessSound();
     } else {
       addWorkspace(formData);
+      playSuccessSound();
     }
     closeFormModal();
   };
 
-  const addItem = (field: "applications" | "websites" | "localFolders", value: string) => {
+  const addItem = (
+    field: "applications" | "websites" | "localFolders",
+    value: string
+  ) => {
     if (!value.trim()) return;
-    setFormData(prev => ({ ...prev, [field]: [...prev[field], value.trim()] }));
-    setFormInput(prev => ({ 
-      ...prev, 
-      [field === "applications" ? "app" : field === "websites" ? "website" : "folder"]: "" 
+    setFormData((prev) => ({ ...prev, [field]: [...prev[field], value.trim()] }));
+    setFormInput((prev) => ({
+      ...prev,
+      [field === "applications"
+        ? "app"
+        : field === "websites"
+        ? "website"
+        : "folder"]: "",
     }));
   };
 
-  const removeItem = (field: "applications" | "websites" | "localFolders", index: number) => {
-    setFormData(prev => ({
+  const removeItem = (
+    field: "applications" | "websites" | "localFolders",
+    index: number
+  ) => {
+    setFormData((prev) => ({
       ...prev,
-      [field]: prev[field].filter((_, i) => i !== index)
+      [field]: prev[field].filter((_, i) => i !== index),
     }));
   };
 
   // Delete Handlers
   const confirmDelete = (workspace: Workspace, e: React.MouseEvent) => {
     e.stopPropagation();
+    playClickSound();
     setActiveWorkspace(workspace);
     setIsDeleteModalOpen(true);
   };
@@ -121,485 +172,765 @@ export default function WorkspacesPage() {
   const executeDelete = () => {
     if (activeWorkspace) {
       deleteWorkspace(activeWorkspace.id);
+      playClickSound();
     }
     setIsDeleteModalOpen(false);
     setActiveWorkspace(null);
-    setIsDetailsModalOpen(false);
   };
 
   // Launch Handlers
   const openLaunchModal = (workspace: Workspace, e: React.MouseEvent) => {
     e.stopPropagation();
+    playClickSound();
     setActiveWorkspace(workspace);
     setLaunchMessage("");
+    setIsLaunching(false);
     setIsLaunchModalOpen(true);
   };
 
   const executeLaunch = async () => {
     if (!activeWorkspace) return;
-    
+    setIsLaunching(true);
+    playClickSound();
     launchWorkspace(activeWorkspace.id);
+
+    if (typeof window !== "undefined") {
+      import("@/utils/activityBus").then(({ dispatchAlfredActivity }) => {
+        dispatchAlfredActivity({
+          type: "workspace_launched",
+          state: "executing",
+          label: "LAUNCHING WORKSPACE",
+          detail: activeWorkspace.name,
+        });
+      });
+    }
 
     if (typeof window !== "undefined" && window.electron?.workspace) {
       try {
-        const result = await window.electron.workspace.launch(activeWorkspace);
-        if (result.success) {
-          setLaunchMessage("Workspace launched successfully!");
+        const result = await Promise.race([
+          window.electron.workspace.launch(activeWorkspace),
+          new Promise<any>((_, reject) =>
+            setTimeout(() => reject(new Error("Workspace launch timed out")), 10000)
+          ),
+        ]);
+        if (result?.success) {
+          AlfredAudioService.play("workspace");
+          setLaunchMessage("Workspace launched successfully.");
         } else {
-          const failedItems = result.results.filter(r => !r.success);
+          const failedItems = Array.isArray(result?.results)
+            ? result.results.filter((r: any) => !r.success)
+            : [];
           if (failedItems.length > 0) {
-            setLaunchMessage(`Workspace launched with warnings: ${failedItems.map(f => `${f.target} (${f.error})`).join(", ")}`);
+            AlfredAudioService.play("error");
+            setLaunchMessage(
+              `Launched with notices: ${failedItems
+                .map((f: any) => `${f.target} (${f.error})`)
+                .join(", ")}`
+            );
           } else {
-            setLaunchMessage("Workspace launched successfully!");
+            AlfredAudioService.play("workspace");
+            setLaunchMessage("Workspace launched successfully.");
           }
         }
-      } catch (err: unknown) {
-        setLaunchMessage("Error launching workspace via desktop service.");
+      } catch (err: any) {
+        AlfredAudioService.play("error");
+        setLaunchMessage(`Launch notice: ${err?.message || "Error launching workspace"}`);
+      } finally {
+        setTimeout(() => {
+          setIsLaunchModalOpen(false);
+          setActiveWorkspace(null);
+          setIsLaunching(false);
+        }, 2000);
       }
-      setTimeout(() => {
-        setIsLaunchModalOpen(false);
-        setActiveWorkspace(null);
-      }, 2500);
       return;
     }
-    
-    // Open websites (fallback for standalone browser mode)
+
+    // Fallback: Open websites
     let openedCount = 0;
-    activeWorkspace.websites.forEach(url => {
+    activeWorkspace.websites.forEach((url) => {
       const newWin = window.open(url, "_blank");
       if (newWin) openedCount++;
     });
 
-    if (openedCount < activeWorkspace.websites.length && activeWorkspace.websites.length > 0) {
-      setLaunchMessage("Your browser may block multiple tabs. Allow popups for the best experience.");
+    if (
+      openedCount < activeWorkspace.websites.length &&
+      activeWorkspace.websites.length > 0
+    ) {
+      AlfredAudioService.play("error");
+      setLaunchMessage(
+        "Browser popup blocker detected. Allow popups for multi-tab workspace launching."
+      );
     } else {
-      setLaunchMessage("Launch successful! Check your browser tabs.");
-      setTimeout(() => {
-        setIsLaunchModalOpen(false);
-        setActiveWorkspace(null);
-      }, 2000);
+      AlfredAudioService.play("workspace");
+      setLaunchMessage("Deployment sequence finished. Check active tabs.");
+    }
+
+    setTimeout(() => {
+      setIsLaunchModalOpen(false);
+      setActiveWorkspace(null);
+      setIsLaunching(false);
+    }, 2000);
+  };
+
+  const openAiCommand = (prompt: string) => {
+    playClickSound();
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("open-command-terminal", {
+          detail: { initialCommand: prompt, autoExecute: false },
+        })
+      );
     }
   };
 
-  // Details Handler
-  const openDetailsModal = (workspace: Workspace) => {
-    setActiveWorkspace(workspace);
-    setIsDetailsModalOpen(true);
-  };
-
   return (
-    <div className="p-4 md:p-8 bg-[#0f1115] min-h-screen">
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+    <div className="p-4 md:p-6 lg:p-8 bg-transparent min-h-screen relative overflow-hidden text-slate-200 select-none">
+      {/* Background Ambient Technical Atmosphere */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_15%,rgba(225,29,72,0.06),transparent_55%)] pointer-events-none" />
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:32px_32px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none" />
+
+      {/* Editorial Header */}
+      <header className="mb-6 flex flex-col md:flex-row justify-between items-start md:items-end gap-4 relative z-10 border-b border-white/[0.06] pb-4">
         <div>
-          <h1 className="text-3xl font-bold text-white mb-2">Workspaces</h1>
-          <p className="text-gray-400">Launch environments tailored for your productivity.</p>
+          <div className="flex items-baseline space-x-3">
+            <h1 className="text-2xl md:text-3xl font-header font-bold text-white tracking-tight">
+              Workspaces
+            </h1>
+            <span className="text-[11px] font-mono text-cyan-400 tracking-wider">
+              DIGITAL ENVIRONMENTS
+            </span>
+          </div>
+          <p className="text-xs text-slate-400 mt-1 font-sans">
+            Automated workstation profiles — orchestrate desktop applications, endpoints, and directories in a single command.
+          </p>
         </div>
-        <button 
-          onClick={() => openFormModal()}
-          className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
-        >
-          <Plus size={20} />
-          <span>New Workspace</span>
-        </button>
+
+        <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => openAiCommand("Launch my ")}
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-sm bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.08] hover:border-cyan-500/30 text-xs font-mono text-slate-300 hover:text-white transition-all cursor-pointer"
+          >
+            <Terminal size={12} className="text-cyan-400" />
+            <span>Ask ALFRED</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => openFormModal()}
+            className="alfred-btn-primary px-3.5 py-1.5 text-xs font-mono flex items-center space-x-1.5 cursor-pointer shadow-md rounded-sm"
+          >
+            <Plus size={13} />
+            <span>Create Profile</span>
+          </button>
+        </div>
       </header>
 
-      {/* Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="bg-[#1e2128] border border-[#2d313b] p-6 rounded-xl flex items-center space-x-4">
-          <div className="p-3 bg-blue-500/20 text-blue-500 rounded-lg"><LayoutGrid size={24} /></div>
+      {/* Asymmetric Environment Capacity Banner (Connected node metrics) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-6 relative z-10">
+        <div className="lg:col-span-8 alfred-panel p-5 border-l-2 border-l-cyan-500/70 flex flex-col justify-between">
           <div>
-            <p className="text-gray-400 text-sm">Total Workspaces</p>
-            <h3 className="text-2xl font-bold text-white">{totalWorkspaces}</h3>
-          </div>
-        </div>
-        <div className="bg-[#1e2128] border border-[#2d313b] p-6 rounded-xl flex items-center space-x-4">
-          <div className="p-3 bg-purple-500/20 text-purple-500 rounded-lg"><Monitor size={24} /></div>
-          <div>
-            <p className="text-gray-400 text-sm">Applications</p>
-            <h3 className="text-2xl font-bold text-white">{totalApps}</h3>
-          </div>
-        </div>
-        <div className="bg-[#1e2128] border border-[#2d313b] p-6 rounded-xl flex items-center space-x-4">
-          <div className="p-3 bg-emerald-500/20 text-emerald-500 rounded-lg"><Globe size={24} /></div>
-          <div>
-            <p className="text-gray-400 text-sm">Websites</p>
-            <h3 className="text-2xl font-bold text-white">{totalWebsites}</h3>
-          </div>
-        </div>
-        <div className="bg-[#1e2128] border border-[#2d313b] p-6 rounded-xl flex items-center space-x-4">
-          <div className="p-3 bg-orange-500/20 text-orange-500 rounded-lg"><FolderIcon size={24} /></div>
-          <div>
-            <p className="text-gray-400 text-sm">Local Folders</p>
-            <h3 className="text-2xl font-bold text-white">{totalFolders}</h3>
-          </div>
-        </div>
-      </div>
-
-      {/* Workspace Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {workspaces.map(ws => (
-          <div 
-            key={ws.id} 
-            onClick={() => openDetailsModal(ws)}
-            className="bg-[#1e2128] border border-[#2d313b] rounded-xl p-6 flex flex-col cursor-pointer hover:border-gray-500 transition-colors"
-          >
-            <div className="flex justify-between items-start mb-4">
-              <div className="flex items-center space-x-3">
-                <div className="p-3 bg-[#2d313b] text-blue-400 rounded-lg">
-                  {getWorkspaceIcon(ws.type)}
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-white">{ws.name}</h3>
-                </div>
-              </div>
-              <div className="flex space-x-2">
-                <button 
-                  onClick={(e) => { e.stopPropagation(); openFormModal(ws); }}
-                  className="text-gray-400 hover:text-blue-500 transition-colors p-1"
-                ><Edit2 size={16} /></button>
-                <button 
-                  onClick={(e) => confirmDelete(ws, e)}
-                  className="text-gray-400 hover:text-red-500 transition-colors p-1"
-                ><Trash2 size={16} /></button>
-              </div>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-mono tracking-widest uppercase text-slate-400">
+                Connected Resource Cluster
+              </span>
+              <span className="text-xs font-mono text-cyan-400 font-bold">
+                {totalWorkspaces} READY PROFILES
+              </span>
             </div>
-            
-            <p className="text-gray-400 text-sm mb-6 flex-1 line-clamp-2">
-              {ws.description || "No description provided."}
+            <p className="text-xs text-slate-300 font-sans max-w-lg mb-4">
+              ALFRED coordinates native application execution, multi-tab web resources, and file paths into synchronized environments.
             </p>
-
-            <div className="grid grid-cols-3 gap-2 mb-6">
-              <div className="bg-[#15181d] rounded-lg p-2 text-center border border-[#2d313b]">
-                <Monitor size={14} className="mx-auto text-purple-400 mb-1" />
-                <span className="text-xs font-bold text-white">{ws.applications.length}</span>
-              </div>
-              <div className="bg-[#15181d] rounded-lg p-2 text-center border border-[#2d313b]">
-                <Globe size={14} className="mx-auto text-emerald-400 mb-1" />
-                <span className="text-xs font-bold text-white">{ws.websites.length}</span>
-              </div>
-              <div className="bg-[#15181d] rounded-lg p-2 text-center border border-[#2d313b]">
-                <FolderIcon size={14} className="mx-auto text-orange-400 mb-1" />
-                <span className="text-xs font-bold text-white">{ws.localFolders.length}</span>
-              </div>
-            </div>
-
-            <div className="flex justify-between items-center text-xs text-gray-500 mb-4 border-t border-[#2d313b] pt-4">
-              <span>Launched: {ws.launchCount} times</span>
-              <span>{ws.lastLaunched ? new Date(ws.lastLaunched).toLocaleDateString() : 'Never'}</span>
-            </div>
-
-            <button 
-              onClick={(e) => openLaunchModal(ws, e)}
-              className="w-full flex items-center justify-center space-x-2 py-3 bg-blue-600/10 text-blue-500 hover:bg-blue-600 hover:text-white rounded-lg transition-colors font-medium"
-            >
-              <Play size={18} fill="currentColor" />
-              <span>Launch</span>
-            </button>
           </div>
-        ))}
+
+          <div className="grid grid-cols-3 gap-3 border-t border-white/[0.06] pt-3 text-xs font-mono">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded bg-cyan-500/10 text-cyan-400">
+                <Monitor size={14} />
+              </div>
+              <div>
+                <div className="text-white font-bold">{totalApps}</div>
+                <div className="text-[10px] text-slate-500 uppercase">Native Apps</div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded bg-rose-500/10 text-rose-400">
+                <Globe size={14} />
+              </div>
+              <div>
+                <div className="text-white font-bold">{totalWebsites}</div>
+                <div className="text-[10px] text-slate-500 uppercase">Websites</div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded bg-amber-500/10 text-amber-400">
+                <FolderIcon size={14} />
+              </div>
+              <div>
+                <div className="text-white font-bold">{totalFolders}</div>
+                <div className="text-[10px] text-slate-500 uppercase">Directories</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right: Workstation Environment Status */}
+        <div className="lg:col-span-4 alfred-panel p-5 flex flex-col justify-between border-t lg:border-t-0 lg:border-r-2 lg:border-r-cyan-500/60">
+          <div className="space-y-1">
+            <div className="text-[10px] font-mono tracking-wider uppercase text-slate-400">
+              Automation Dispatcher
+            </div>
+            <div className="text-sm font-mono text-emerald-400 font-bold flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              DESKTOP RUNTIME READY
+            </div>
+          </div>
+
+          <div className="text-xs font-sans text-slate-400 leading-relaxed">
+            Issue <span className="font-mono text-cyan-300">&quot;Launch [name]&quot;</span> anywhere via Command Terminal to prepare your active work context.
+          </div>
+        </div>
       </div>
 
-      {/* Details Modal */}
-      {isDetailsModalOpen && activeWorkspace && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-[#1e2128] border border-[#2d313b] rounded-xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh]">
-            <div className="flex justify-between items-start p-6 border-b border-[#2d313b]">
-              <div className="flex items-center space-x-4">
-                <div className="p-3 bg-[#2d313b] text-blue-400 rounded-lg">
-                  {getWorkspaceIcon(activeWorkspace.type)}
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-white">{activeWorkspace.name}</h2>
-                  <p className="text-gray-400 text-sm">Created {new Date(activeWorkspace.createdDate).toLocaleDateString()}</p>
-                </div>
-              </div>
-              <button onClick={() => setIsDetailsModalOpen(false)} className="text-gray-400 hover:text-white p-1">
-                <X size={24} />
-              </button>
-            </div>
-            
-            <div className="p-6 overflow-y-auto flex-1 space-y-6">
-              <p className="text-gray-300">{activeWorkspace.description}</p>
-              
-              <div className="grid grid-cols-2 gap-4 text-sm text-gray-400 mb-2">
-                <div className="bg-[#15181d] p-3 rounded-lg border border-[#2d313b]">
-                  Launch Count: <span className="text-white font-bold ml-2">{activeWorkspace.launchCount}</span>
-                </div>
-                <div className="bg-[#15181d] p-3 rounded-lg border border-[#2d313b]">
-                  Last Launched: <span className="text-white font-bold ml-2">{activeWorkspace.lastLaunched ? new Date(activeWorkspace.lastLaunched).toLocaleString() : 'Never'}</span>
-                </div>
-              </div>
-
-              <div>
-                <h4 className="text-white font-bold mb-3 flex items-center"><Monitor size={16} className="mr-2 text-purple-400"/> Applications</h4>
-                {activeWorkspace.applications.length > 0 ? (
-                  <ul className="list-disc list-inside text-gray-400 space-y-1">
-                    {activeWorkspace.applications.map((app, i) => <li key={i}>{app}</li>)}
-                  </ul>
-                ) : <p className="text-gray-600 text-sm">No applications configured.</p>}
-              </div>
-
-              <div>
-                <h4 className="text-white font-bold mb-3 flex items-center"><Globe size={16} className="mr-2 text-emerald-400"/> Websites</h4>
-                {activeWorkspace.websites.length > 0 ? (
-                  <ul className="list-disc list-inside text-gray-400 space-y-1">
-                    {activeWorkspace.websites.map((url, i) => <li key={i}>{url}</li>)}
-                  </ul>
-                ) : <p className="text-gray-600 text-sm">No websites configured.</p>}
-              </div>
-
-              <div>
-                <h4 className="text-white font-bold mb-3 flex items-center"><FolderIcon size={16} className="mr-2 text-orange-400"/> Local Folders</h4>
-                {activeWorkspace.localFolders.length > 0 ? (
-                  <ul className="list-disc list-inside text-gray-400 space-y-1">
-                    {activeWorkspace.localFolders.map((f, i) => <li key={i}>{f}</li>)}
-                  </ul>
-                ) : <p className="text-gray-600 text-sm">No local folders configured.</p>}
-              </div>
-            </div>
-            
-            <div className="p-6 border-t border-[#2d313b] flex space-x-3">
-              <button 
-                onClick={(e) => { setIsDetailsModalOpen(false); openLaunchModal(activeWorkspace, e); }}
-                className="flex-1 py-3 flex justify-center items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium"
-              >
-                <Play size={18} fill="currentColor" />
-                <span>Launch Workspace</span>
-              </button>
-            </div>
-          </div>
+      {/* Main Console & Profiles Grid */}
+      <div className="alfred-panel p-5 relative z-10 space-y-4">
+        <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
+          <h2 className="text-xs font-mono font-bold tracking-widest text-white/80 uppercase flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+            CONFIGURED WORKSPACE ENVIRONMENTS
+          </h2>
+          <span className="text-[10px] font-mono text-slate-500">
+            {totalWorkspaces} PROFILES
+          </span>
         </div>
-      )}
 
-      {/* Launch Summary Modal */}
-      {isLaunchModalOpen && activeWorkspace && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-[#1e2128] border border-blue-500/30 rounded-xl w-full max-w-lg shadow-2xl flex flex-col">
-            <div className="p-6 border-b border-[#2d313b] text-center">
-              <div className="w-16 h-16 bg-blue-500/20 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                {getWorkspaceIcon(activeWorkspace.type, 32)}
-              </div>
-              <h2 className="text-2xl font-bold text-white mb-1">Launching {activeWorkspace.name}</h2>
-              <p className="text-gray-400 text-sm">Review the resources before launching.</p>
-            </div>
-            
-            <div className="p-6 max-h-[50vh] overflow-y-auto space-y-6">
-              <div className="bg-blue-500/10 border border-blue-500/20 text-blue-200 text-sm p-4 rounded-lg">
-                <strong>Note:</strong> Applications, websites, and local folders in this workspace will be launched automatically via ALFRED desktop service.
-              </div>
-
-              {activeWorkspace.applications.length > 0 && (
-                <div>
-                  <h4 className="text-gray-300 font-bold mb-2">Applications To Open (Manual):</h4>
-                  <ul className="list-disc list-inside text-gray-400">
-                    {activeWorkspace.applications.map((app, i) => <li key={i}>{app}</li>)}
-                  </ul>
-                </div>
-              )}
-
-              {activeWorkspace.websites.length > 0 && (
-                <div>
-                  <h4 className="text-gray-300 font-bold mb-2">Websites To Open:</h4>
-                  <ul className="list-disc list-inside text-gray-400">
-                    {activeWorkspace.websites.map((url, i) => <li key={i} className="truncate">{url}</li>)}
-                  </ul>
-                </div>
-              )}
-
-              {activeWorkspace.localFolders.length > 0 && (
-                <div>
-                  <h4 className="text-gray-300 font-bold mb-2">Local Folders (Manual):</h4>
-                  <ul className="list-disc list-inside text-gray-400">
-                    {activeWorkspace.localFolders.map((f, i) => <li key={i} className="truncate">{f}</li>)}
-                  </ul>
-                </div>
-              )}
-            </div>
-
-            {launchMessage && (
-              <div className="px-6 py-3 bg-[#15181d] text-center text-sm font-medium text-orange-400 border-t border-[#2d313b]">
-                {launchMessage}
-              </div>
-            )}
-            
-            <div className="p-6 border-t border-[#2d313b] flex space-x-3">
-              <button 
-                onClick={() => setIsLaunchModalOpen(false)}
-                className="flex-1 py-3 bg-[#2d313b] hover:bg-gray-600 text-white rounded-lg transition-colors"
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={executeLaunch}
-                className="flex-1 py-3 flex justify-center items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium"
-              >
-                <Play size={18} fill="currentColor" />
-                <span>Confirm Launch</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Form Modal */}
-      {isFormModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-[#1e2128] border border-[#2d313b] rounded-xl w-full max-w-xl shadow-2xl flex flex-col max-h-[90vh]">
-            <div className="p-6 border-b border-[#2d313b] flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-white">
-                {activeWorkspace ? "Edit Workspace" : "New Workspace"}
-              </h2>
-              <button onClick={closeFormModal} className="text-gray-400 hover:text-white">
-                <X size={24} />
-              </button>
-            </div>
-            
-            <div className="p-6 overflow-y-auto space-y-6">
-              <form id="workspace-form" onSubmit={handleFormSubmit} className="space-y-4">
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="col-span-2">
-                    <label className="block text-sm font-medium text-gray-400 mb-1">Name *</label>
-                    <input 
-                      type="text" required value={formData.name}
-                      onChange={e => setFormData({...formData, name: e.target.value})}
-                      className="w-full bg-[#15181d] border border-[#2d313b] rounded-lg p-2.5 text-white focus:outline-none focus:border-blue-500"
-                    />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {workspaces.map((ws) => (
+            <div
+              key={ws.id}
+              onMouseEnter={playHoverSound}
+              className="p-4 rounded border bg-white/[0.02] hover:bg-white/[0.04] border-white/[0.06] hover:border-white/[0.16] transition-all flex flex-col justify-between group"
+            >
+              <div>
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-cyan-400 group-hover:text-rose-400 transition-colors">
+                      {getWorkspaceIcon(ws.type, 18)}
+                    </span>
+                    <span className="text-sm font-header font-bold text-white tracking-wide truncate">
+                      {ws.name}
+                    </span>
                   </div>
+                  <span className="text-[9px] font-mono px-2 py-0.5 rounded bg-white/[0.04] text-slate-400 border border-white/[0.06] uppercase">
+                    {ws.type}
+                  </span>
+                </div>
+
+                <p className="text-xs text-slate-400 mt-1 line-clamp-2 leading-relaxed font-sans">
+                  {ws.description || "Configured workspace environment profile."}
+                </p>
+
+                {/* Connected Environment Diagram Nodes */}
+                <div className="mt-3.5 space-y-2 text-[11px] font-mono bg-black/40 p-3 rounded border border-white/[0.05]">
+                  <div className="flex items-center justify-between border-b border-white/[0.04] pb-1.5">
+                    <span className="flex items-center space-x-1.5 text-slate-400">
+                      <Monitor size={12} className="text-cyan-400" />
+                      <span>Apps:</span>
+                    </span>
+                    <span className="text-white truncate max-w-[130px] font-sans">
+                      {ws.applications.length > 0 ? ws.applications.join(", ") : "None"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between border-b border-white/[0.04] pb-1.5">
+                    <span className="flex items-center space-x-1.5 text-slate-400">
+                      <Globe size={12} className="text-rose-400" />
+                      <span>Websites:</span>
+                    </span>
+                    <span className="text-white truncate max-w-[130px] font-mono text-[10px]">
+                      {ws.websites.length > 0 ? `${ws.websites.length} endpoints` : "None"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center space-x-1.5 text-slate-400">
+                      <FolderIcon size={12} className="text-amber-400" />
+                      <span>Folders:</span>
+                    </span>
+                    <span className="text-white truncate max-w-[130px] font-mono text-[10px]">
+                      {ws.localFolders.length > 0 ? `${ws.localFolders.length} paths` : "None"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Ribbon */}
+              <div className="mt-4 pt-3 border-t border-white/[0.05] flex items-center justify-between">
+                <div className="text-[10px] font-mono text-slate-500 truncate max-w-[130px]">
+                  {ws.lastLaunched
+                    ? `Launched ${new Date(ws.lastLaunched).toLocaleDateString()}`
+                    : "Never deployed"}
+                </div>
+
+                <div className="flex items-center space-x-1.5">
+                  <button
+                    type="button"
+                    onClick={(e) => openFormModal(ws, e)}
+                    className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+                    title="Configure Profile"
+                  >
+                    <Edit2 size={13} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => confirmDelete(ws, e)}
+                    className="p-1.5 rounded text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                    title="Purge Profile"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => openLaunchModal(ws, e)}
+                    className="px-2.5 py-1 rounded bg-[#E11D48] hover:bg-[#BE123C] text-white text-xs font-mono font-semibold transition-all cursor-pointer flex items-center space-x-1 shadow-sm"
+                  >
+                    <Play size={11} fill="currentColor" />
+                    <span>Launch</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Workspace Deployment Modal */}
+      <AnimatePresence>
+        {isLaunchModalOpen && activeWorkspace && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/75 backdrop-blur-md flex items-center justify-center p-4 z-[9999]"
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 15 }}
+              className="bg-[#0B0E17] border border-white/[0.15] shadow-2xl rounded-lg w-full max-w-md overflow-hidden flex flex-col"
+            >
+              <div className="p-4 border-b border-white/[0.08] flex items-center justify-between bg-white/[0.02]">
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 rounded-full bg-[#E11D48] shadow-[0_0_6px_#E11D48]" />
+                  <h2 className="font-header text-sm font-bold text-white tracking-wider uppercase">
+                    DEPLOY: {activeWorkspace.name}
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsLaunchModalOpen(false)}
+                  className="text-slate-400 hover:text-white transition-colors cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="p-5 space-y-3.5 font-mono text-xs">
+                {activeWorkspace.applications.length > 0 && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">Type/Icon</label>
-                    <select 
-                      value={formData.type}
-                      onChange={e => setFormData({...formData, type: e.target.value as WorkspaceType})}
-                      className="w-full bg-[#15181d] border border-[#2d313b] rounded-lg p-2.5 text-white focus:outline-none focus:border-blue-500"
-                    >
-                      <option value="dsa">DSA</option>
-                      <option value="datascience">Data Science</option>
-                      <option value="hackathon">Hackathon</option>
-                      <option value="machinelearning">Machine Learning</option>
-                      <option value="custom">Custom</option>
-                    </select>
+                    <h4 className="text-slate-400 text-[10px] uppercase tracking-wider mb-1">
+                      Applications ({activeWorkspace.applications.length}):
+                    </h4>
+                    <div className="space-y-1">
+                      {activeWorkspace.applications.map((app, i) => (
+                        <div key={i} className="flex items-center text-slate-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#E11D48] mr-2" />
+                          <span>{app}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
+                {activeWorkspace.websites.length > 0 && (
+                  <div>
+                    <h4 className="text-slate-400 text-[10px] uppercase tracking-wider mb-1">
+                      Web Endpoints ({activeWorkspace.websites.length}):
+                    </h4>
+                    <div className="space-y-1">
+                      {activeWorkspace.websites.map((url, i) => (
+                        <div key={i} className="flex items-center text-slate-300 truncate">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#06B6D4] mr-2 shrink-0" />
+                          <span className="truncate">{url}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {activeWorkspace.localFolders.length > 0 && (
+                  <div>
+                    <h4 className="text-slate-400 text-[10px] uppercase tracking-wider mb-1">
+                      Target Directories ({activeWorkspace.localFolders.length}):
+                    </h4>
+                    <div className="space-y-1">
+                      {activeWorkspace.localFolders.map((f, i) => (
+                        <div key={i} className="flex items-center text-slate-300 truncate">
+                          <span className="w-1.5 h-1.5 rounded-full bg-slate-400 mr-2 shrink-0" />
+                          <span className="truncate">{f}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {launchMessage && (
+                  <div className="p-2.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[11px] font-semibold animate-pulse">
+                    {launchMessage}
+                  </div>
+                )}
+              </div>
+
+              <div className="p-3.5 border-t border-white/[0.08] flex space-x-2.5 bg-black/40">
+                <button
+                  type="button"
+                  onClick={() => setIsLaunchModalOpen(false)}
+                  className="flex-1 alfred-btn-secondary"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isLaunching}
+                  onClick={executeLaunch}
+                  className="flex-1 alfred-btn-primary"
+                >
+                  <Play size={12} fill="currentColor" />
+                  <span>{isLaunching ? "Deploying..." : "Launch Profile"}</span>
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Configure Workspace Profile Modal */}
+      <AnimatePresence>
+        {isFormModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/75 backdrop-blur-md flex items-center justify-center p-4 z-[9999]"
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 15 }}
+              className="bg-[#0B0E17] border border-white/[0.15] shadow-2xl rounded-lg w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col font-mono text-xs"
+            >
+              <div className="p-4 border-b border-white/[0.08] flex items-center justify-between bg-white/[0.02]">
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 rounded-full bg-[#E11D48] shadow-[0_0_6px_#E11D48]" />
+                  <h2 className="font-header text-sm font-bold text-white tracking-wider uppercase">
+                    {activeWorkspace ? "CONFIGURE PROFILE" : "CREATE PROFILE"}
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeFormModal}
+                  className="text-slate-400 hover:text-white transition-colors cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <form onSubmit={handleFormSubmit} className="p-5 overflow-y-auto space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-1">Description</label>
-                  <textarea 
-                    value={formData.description}
-                    onChange={e => setFormData({...formData, description: e.target.value})}
-                    className="w-full bg-[#15181d] border border-[#2d313b] rounded-lg p-2.5 text-white focus:outline-none focus:border-blue-500 min-h-[60px]"
+                  <label className="block text-[10px] text-slate-400 uppercase tracking-wider mb-1.5">
+                    Profile Identifier:
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Deep Learning R&D..."
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="alfred-input w-full"
+                    autoFocus
                   />
                 </div>
-              </form>
 
-              {/* Dynamic Lists */}
-              <div className="space-y-6 pt-4 border-t border-[#2d313b]">
-                {/* Applications */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">Applications</label>
-                  <div className="flex space-x-2 mb-2">
-                    <input 
-                      type="text" value={formInput.app}
-                      onChange={e => setFormInput({...formInput, app: e.target.value})}
-                      placeholder="e.g. VS Code"
-                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addItem("applications", formInput.app); }}}
-                      className="flex-1 bg-[#15181d] border border-[#2d313b] rounded-lg p-2 text-sm text-white focus:outline-none focus:border-blue-500"
-                    />
-                    <button type="button" onClick={() => addItem("applications", formInput.app)} className="bg-[#2d313b] text-white px-3 rounded-lg hover:bg-gray-600"><Plus size={18} /></button>
+                  <label className="block text-[10px] text-slate-400 uppercase tracking-wider mb-1.5">
+                    Environment Purpose:
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Brief description of workflow..."
+                    value={formData.description}
+                    onChange={(e) =>
+                      setFormData({ ...formData, description: e.target.value })
+                    }
+                    className="alfred-input w-full"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] text-slate-400 uppercase tracking-wider mb-1.5">
+                    Profile Type:
+                  </label>
+                  <select
+                    value={formData.type}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        type: e.target.value as WorkspaceType,
+                      })
+                    }
+                    className="alfred-input w-full bg-[#0B0E17]"
+                  >
+                    <option value="dsa">DSA</option>
+                    <option value="datascience">Data Science</option>
+                    <option value="hackathon">Hackathon</option>
+                    <option value="machinelearning">Machine Learning</option>
+                    <option value="college">College</option>
+                    <option value="personal">Personal</option>
+                    <option value="custom">Custom</option>
+                  </select>
+                </div>
+
+                {/* Applications Section */}
+                <div className="pt-2 border-t border-white/[0.06]">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-[10px] text-slate-400 uppercase tracking-wider">
+                      Applications (e.g. VS Code, Chrome, Spotify):
+                    </label>
+                    <button
+                      type="button"
+                      id="btn-browse-installed-apps"
+                      onClick={() => setIsAppPickerOpen(true)}
+                      className="text-[11px] text-cyan-400 hover:text-cyan-300 font-bold flex items-center space-x-1 cursor-pointer"
+                    >
+                      <Laptop size={12} />
+                      <span>Browse Installed Apps</span>
+                    </button>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {formData.applications.map((item, i) => (
-                      <span key={i} className="flex items-center space-x-1 bg-[#15181d] border border-[#2d313b] text-gray-300 px-2 py-1 rounded text-sm">
-                        <span>{item}</span>
-                        <button type="button" onClick={() => removeItem("applications", i)} className="text-gray-500 hover:text-red-500"><X size={14} /></button>
+                  <div className="flex gap-2 mb-2">
+                    <input
+                      type="text"
+                      placeholder="Add application name or alias..."
+                      value={formInput.app}
+                      onChange={(e) =>
+                        setFormInput({ ...formInput, app: e.target.value })
+                      }
+                      className="alfred-input flex-1"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          addItem("applications", formInput.app);
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => addItem("applications", formInput.app)}
+                      className="alfred-btn-secondary px-3 py-1.5"
+                    >
+                      + Add
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsAppPickerOpen(true)}
+                      className="alfred-btn-secondary px-3 py-1.5 text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
+                    >
+                      <Laptop size={12} />
+                      <span>Browse</span>
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {formData.applications.map((app, i) => (
+                      <span
+                        key={i}
+                        className="px-2 py-0.5 rounded bg-white/[0.04] border border-white/[0.08] text-slate-300 flex items-center space-x-1"
+                      >
+                        <span>{app}</span>
+                        <X
+                          size={11}
+                          className="cursor-pointer hover:text-rose-400"
+                          onClick={() => removeItem("applications", i)}
+                        />
                       </span>
                     ))}
                   </div>
                 </div>
 
-                {/* Websites */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">Websites</label>
-                  <div className="flex space-x-2 mb-2">
-                    <input 
-                      type="url" value={formInput.website}
-                      onChange={e => setFormInput({...formInput, website: e.target.value})}
-                      placeholder="e.g. https://github.com"
-                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addItem("websites", formInput.website); }}}
-                      className="flex-1 bg-[#15181d] border border-[#2d313b] rounded-lg p-2 text-sm text-white focus:outline-none focus:border-blue-500"
+                {/* Websites Section */}
+                <div className="pt-2 border-t border-white/[0.06]">
+                  <label className="block text-[10px] text-slate-400 uppercase tracking-wider mb-1.5">
+                    Web Endpoints (URLs):
+                  </label>
+                  <div className="flex gap-2 mb-2">
+                    <input
+                      type="text"
+                      placeholder="https://..."
+                      value={formInput.website}
+                      onChange={(e) =>
+                        setFormInput({ ...formInput, website: e.target.value })
+                      }
+                      className="alfred-input flex-1"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          addItem("websites", formInput.website);
+                        }
+                      }}
                     />
-                    <button type="button" onClick={() => addItem("websites", formInput.website)} className="bg-[#2d313b] text-white px-3 rounded-lg hover:bg-gray-600"><Plus size={18} /></button>
+                    <button
+                      type="button"
+                      onClick={() => addItem("websites", formInput.website)}
+                      className="alfred-btn-secondary px-3 py-1.5"
+                    >
+                      + Add
+                    </button>
                   </div>
-                  <div className="space-y-2">
-                    {formData.websites.map((item, i) => (
-                      <div key={i} className="flex items-center justify-between bg-[#15181d] border border-[#2d313b] text-gray-300 px-3 py-2 rounded text-sm">
-                        <span className="truncate pr-4">{item}</span>
-                        <button type="button" onClick={() => removeItem("websites", i)} className="text-gray-500 hover:text-red-500 shrink-0"><X size={16} /></button>
-                      </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {formData.websites.map((url, i) => (
+                      <span
+                        key={i}
+                        className="px-2 py-0.5 rounded bg-white/[0.04] border border-white/[0.08] text-slate-300 flex items-center space-x-1 truncate max-w-[260px]"
+                      >
+                        <span className="truncate">{url}</span>
+                        <X
+                          size={11}
+                          className="cursor-pointer hover:text-rose-400 shrink-0"
+                          onClick={() => removeItem("websites", i)}
+                        />
+                      </span>
                     ))}
                   </div>
                 </div>
 
-                {/* Folders */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">Local Folders</label>
-                  <div className="flex space-x-2 mb-2">
-                    <input 
-                      type="text" value={formInput.folder}
-                      onChange={e => setFormInput({...formInput, folder: e.target.value})}
-                      placeholder="e.g. D:\Projects\MyProject"
-                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addItem("localFolders", formInput.folder); }}}
-                      className="flex-1 bg-[#15181d] border border-[#2d313b] rounded-lg p-2 text-sm text-white focus:outline-none focus:border-blue-500"
+                {/* Local Folders Section */}
+                <div className="pt-2 border-t border-white/[0.06]">
+                  <label className="block text-[10px] text-slate-400 uppercase tracking-wider mb-1.5">
+                    Local Directories:
+                  </label>
+                  <div className="flex gap-2 mb-2">
+                    <input
+                      type="text"
+                      placeholder="D:\Path\To\Project..."
+                      value={formInput.folder}
+                      onChange={(e) =>
+                        setFormInput({ ...formInput, folder: e.target.value })
+                      }
+                      className="alfred-input flex-1"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          addItem("localFolders", formInput.folder);
+                        }
+                      }}
                     />
-                    <button type="button" onClick={() => addItem("localFolders", formInput.folder)} className="bg-[#2d313b] text-white px-3 rounded-lg hover:bg-gray-600"><Plus size={18} /></button>
+                    <button
+                      type="button"
+                      onClick={() => addItem("localFolders", formInput.folder)}
+                      className="alfred-btn-secondary px-3 py-1.5"
+                    >
+                      + Add
+                    </button>
                   </div>
-                  <div className="space-y-2">
-                    {formData.localFolders.map((item, i) => (
-                      <div key={i} className="flex items-center justify-between bg-[#15181d] border border-[#2d313b] text-gray-300 px-3 py-2 rounded text-sm">
-                        <span className="truncate pr-4">{item}</span>
-                        <button type="button" onClick={() => removeItem("localFolders", i)} className="text-gray-500 hover:text-red-500 shrink-0"><X size={16} /></button>
-                      </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {formData.localFolders.map((f, i) => (
+                      <span
+                        key={i}
+                        className="px-2 py-0.5 rounded bg-white/[0.04] border border-white/[0.08] text-slate-300 flex items-center space-x-1 truncate max-w-[260px]"
+                      >
+                        <span className="truncate">{f}</span>
+                        <X
+                          size={11}
+                          className="cursor-pointer hover:text-rose-400 shrink-0"
+                          onClick={() => removeItem("localFolders", i)}
+                        />
+                      </span>
                     ))}
                   </div>
                 </div>
-              </div>
-            </div>
 
-            <div className="p-6 border-t border-[#2d313b] flex space-x-3">
-              <button type="button" onClick={closeFormModal} className="flex-1 py-2.5 bg-[#2d313b] hover:bg-gray-600 text-white rounded-lg transition-colors">
-                Cancel
-              </button>
-              <button type="submit" form="workspace-form" className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium">
-                {activeWorkspace ? "Save Changes" : "Create Workspace"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+                <div className="pt-4 border-t border-white/[0.08] flex space-x-2.5">
+                  <button
+                    type="button"
+                    onClick={closeFormModal}
+                    className="flex-1 alfred-btn-secondary"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={!formData.name.trim()}
+                    className="flex-1 alfred-btn-primary"
+                  >
+                    <CheckCircle2 size={13} />
+                    <span>{activeWorkspace ? "Save Changes" : "Commit Profile"}</span>
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Delete Confirmation Modal */}
-      {isDeleteModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-[#1e2128] border border-[#2d313b] rounded-xl p-6 w-full max-w-sm shadow-2xl text-center">
-            <Trash2 size={48} className="mx-auto text-red-500 mb-4" />
-            <h2 className="text-xl font-bold text-white mb-2">Delete Workspace?</h2>
-            <p className="text-gray-400 mb-6">Are you sure you want to delete this workspace? This action cannot be undone.</p>
-            <div className="flex space-x-3">
-              <button 
-                onClick={() => setIsDeleteModalOpen(false)}
-                className="flex-1 py-2 bg-[#2d313b] hover:bg-gray-600 text-white rounded-lg transition-colors"
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={executeDelete}
-                className="flex-1 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-medium"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <AnimatePresence>
+        {isDeleteModalOpen && activeWorkspace && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-[9999]"
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 15 }}
+              className="bg-[#0B0E17] border border-rose-500/30 shadow-2xl rounded-lg w-full max-w-sm overflow-hidden p-5 font-mono text-xs"
+            >
+              <h3 className="font-header text-sm font-bold text-white uppercase mb-2 text-rose-400">
+                PURGE WORKSPACE PROFILE
+              </h3>
+              <p className="text-slate-300 mb-5 leading-relaxed">
+                Are you sure you want to purge profile &quot;{activeWorkspace.name}&quot;?
+                All application and web configurations will be deleted.
+              </p>
+              <div className="flex space-x-2.5">
+                <button
+                  type="button"
+                  onClick={() => setIsDeleteModalOpen(false)}
+                  className="flex-1 alfred-btn-secondary"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={executeDelete}
+                  className="flex-1 py-1.5 px-3 rounded bg-rose-600 hover:bg-rose-700 text-white font-semibold transition-all cursor-pointer text-center"
+                >
+                  Confirm Purge
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Windows Application Picker Modal */}
+      <ApplicationPickerModal
+        isOpen={isAppPickerOpen}
+        onClose={() => setIsAppPickerOpen(false)}
+        onSelectApplication={(appName) => {
+          addItem("applications", appName);
+        }}
+      />
     </div>
   );
 }

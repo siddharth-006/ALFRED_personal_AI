@@ -9,6 +9,10 @@ export interface AppResolutionSuccess {
     success: true;
     appName: string;
     executable: string;
+    appId?: string;
+    arguments?: string[];
+    workingDirectory?: string;
+    isPWA?: boolean;
 }
 
 export interface AppResolutionFailure {
@@ -77,20 +81,28 @@ export const APP_DISPLAY_NAMES: Record<string, string> = {
  * Regex to validate that executable names contain ONLY safe alphanumeric characters,
  * hyphens, or underscores. No shell metacharacters, spaces, or paths allowed.
  */
+import { approvedAppsService } from "../services/approved-apps.service";
+import { appDiscoveryService } from "../services/app-discovery.service";
+
+/**
+ * Regex to validate that executable names contain ONLY safe alphanumeric characters,
+ * hyphens, underscores, or valid Windows absolute path format ending with .exe.
+ */
 const SAFE_EXECUTABLE_REGEX = /^[a-zA-Z0-9_-]+$/;
 
 /**
  * Regex to detect potential shell metacharacters or dangerous control sequences in raw inputs.
- * Strictly blocks path separators (/ and \), command delimiters, subshells, redirections, and pipes.
+ * Strictly blocks command delimiters, subshells, redirections, and pipes.
+ * Allows safe display characters such as spaces, parentheses (e.g. "haveloc (1)"), hyphens, and plus signs.
  */
-const SHELL_METACHARACTERS_REGEX = /[;&|`$()<>{}\\/\n\r]/;
+const SHELL_METACHARACTERS_REGEX = /[;&|`$<>{}\n\r]/;
 
 export class AppResolverTool {
     /**
-     * Resolves a human-readable application name to a safe executable command.
+     * Resolves a human-readable application name to a safe executable command or approved path.
      *
-     * @param rawAppName Human-readable application name (e.g. "VS Code", "Chrome")
-     * @returns AppResolutionResult containing executable name or failure explanation
+     * @param rawAppName Human-readable application name (e.g. "VS Code", "Chrome", "Notepad")
+     * @returns AppResolutionResult containing executable name/path or failure explanation
      */
     public resolveApplication(rawAppName: string): AppResolutionResult {
         if (typeof rawAppName !== "string" || !rawAppName.trim()) {
@@ -114,35 +126,57 @@ export class AppResolverTool {
             };
         }
 
-        // Normalize input for strict lookup (lowercase, collapse multiple spaces)
+        // Normalize input for lookup
         const normalized = trimmedInput.toLowerCase().replace(/\s+/g, " ");
 
-        // Security check 2: Strict whitelist lookup (no dynamic evaluation or fuzzy matching)
-        const resolvedExecutable = APP_WHITELIST[normalized];
+        // Step 1: Built-in application whitelist lookup
+        const builtInExecutable = APP_WHITELIST[normalized];
+        if (builtInExecutable && SAFE_EXECUTABLE_REGEX.test(builtInExecutable)) {
+            return {
+                success: true,
+                appName: trimmedInput,
+                executable: builtInExecutable,
+            };
+        }
 
-        if (!resolvedExecutable) {
+        // Step 2: Check Approved Application Registry
+        const approvedApp = approvedAppsService.findApprovedApp(trimmedInput);
+        if (approvedApp) {
+            return {
+                success: true,
+                appName: approvedApp.name,
+                executable: approvedApp.executablePath,
+                appId: approvedApp.id,
+                arguments: approvedApp.arguments,
+                workingDirectory: approvedApp.workingDirectory,
+                isPWA: approvedApp.isPWA,
+            };
+        }
+
+        // Step 3: Check if application was discovered on Windows but not yet approved by user
+        const cachedDiscovered = appDiscoveryService.getCachedDiscovered();
+        const discoveredMatch = cachedDiscovered.find(
+            (d) =>
+                d.name.toLowerCase() === normalized ||
+                d.id.toLowerCase() === normalized ||
+                (d.aliases && d.aliases.some((a) => a.toLowerCase() === normalized))
+        );
+
+        if (discoveredMatch) {
             return {
                 success: false,
                 appName: trimmedInput,
                 executable: null,
-                error: "Unsupported application.",
+                error: `${discoveredMatch.name} is installed on Windows but has not been approved for ALFRED. Approve it in Application Settings first.`,
             };
         }
 
-        // Security check 3: Verify the resolved executable strictly matches safe format
-        if (!SAFE_EXECUTABLE_REGEX.test(resolvedExecutable)) {
-            return {
-                success: false,
-                appName: trimmedInput,
-                executable: null,
-                error: "Resolved executable failed security validation.",
-            };
-        }
-
+        // Step 4: Unknown application
         return {
-            success: true,
+            success: false,
             appName: trimmedInput,
-            executable: resolvedExecutable,
+            executable: null,
+            error: `I couldn't find an approved application named '${trimmedInput}'.`,
         };
     }
 }

@@ -60,9 +60,7 @@ export async function ollamaGenerate(
     temperature?: number,
     maxTokens?: number
 ): Promise<OllamaClientResult> {
-    const url = `${config.endpointUrl.replace(/\/$/, "")}/api/generate`;
     const timeoutMs = config.timeoutMs ?? 60_000;
-
     const payload: OllamaGeneratePayload = {
         model: config.modelName,
         prompt,
@@ -77,60 +75,73 @@ export async function ollamaGenerate(
         payload.options!.num_predict = maxTokens;
     }
 
-    // Use AbortController for timeout
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-    try {
-        const res = await fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-            signal: controller.signal,
-        });
-
-        clearTimeout(timer);
-
-        if (!res.ok) {
-            const errBody = await res.text().catch(() => "");
-            return {
-                success: false,
-                rawText: "",
-                error: `Ollama endpoint returned HTTP ${res.status}: ${errBody}`,
-                isEndpointError: true,
-            };
-        }
-
-        const json: OllamaGenerateRawResponse = await res.json();
-
-        if (!json.response || typeof json.response !== "string") {
-            return {
-                success: false,
-                rawText: "",
-                error: "Ollama response is missing or has an invalid 'response' field.",
-                isEndpointError: true,
-            };
-        }
-
-        return { success: true, rawText: json.response };
-    } catch (err: unknown) {
-        clearTimeout(timer);
-        const message = err instanceof Error ? err.message : String(err);
-
-        if (message.includes("abort") || message.includes("signal")) {
-            return {
-                success: false,
-                rawText: "",
-                error: `Ollama request timed out after ${timeoutMs}ms.`,
-            };
-        }
-
-        return {
-            success: false,
-            rawText: "",
-            error: `Ollama connection failed: ${message}`,
-        };
+    const endpointsToTry = [config.endpointUrl];
+    if (config.endpointUrl.includes("localhost")) {
+        endpointsToTry.push(config.endpointUrl.replace("localhost", "127.0.0.1"));
+    } else if (config.endpointUrl.includes("127.0.0.1")) {
+        endpointsToTry.push(config.endpointUrl.replace("127.0.0.1", "localhost"));
     }
+
+    let lastError = "";
+
+    for (const ep of endpointsToTry) {
+        const url = `${ep.replace(/\/$/, "")}/api/generate`;
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+        try {
+            const res = await fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+                signal: controller.signal,
+            });
+
+            clearTimeout(timer);
+
+            if (!res.ok) {
+                const errBody = await res.text().catch(() => "");
+                return {
+                    success: false,
+                    rawText: "",
+                    error: `Ollama endpoint returned HTTP ${res.status}: ${errBody}`,
+                    isEndpointError: true,
+                };
+            }
+
+            const json: OllamaGenerateRawResponse = await res.json();
+
+            if (!json.response || typeof json.response !== "string") {
+                return {
+                    success: false,
+                    rawText: "",
+                    error: "Ollama response is missing or has an invalid 'response' field.",
+                    isEndpointError: true,
+                };
+            }
+
+            return { success: true, rawText: json.response };
+        } catch (err: unknown) {
+            clearTimeout(timer);
+            const message = err instanceof Error ? err.message : String(err);
+
+            if (message.includes("abort") || message.includes("signal")) {
+                return {
+                    success: false,
+                    rawText: "",
+                    error: `Ollama request timed out after ${timeoutMs}ms.`,
+                };
+            }
+
+            lastError = `Ollama connection failed: ${message}`;
+        }
+    }
+
+    return {
+        success: false,
+        rawText: "",
+        error: lastError || "Failed to reach Ollama endpoint.",
+    };
 }
 
 /**
@@ -138,16 +149,27 @@ export async function ollamaGenerate(
  * Returns true if reachable, false otherwise.
  */
 export async function ollamaPing(endpointUrl: string, timeoutMs = 3_000): Promise<boolean> {
-    const url = `${endpointUrl.replace(/\/$/, "")}/api/tags`;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-    try {
-        const res = await fetch(url, { method: "GET", signal: controller.signal });
-        clearTimeout(timer);
-        return res.ok;
-    } catch {
-        clearTimeout(timer);
-        return false;
+    const endpointsToTry = [endpointUrl];
+    if (endpointUrl.includes("localhost")) {
+        endpointsToTry.push(endpointUrl.replace("localhost", "127.0.0.1"));
+    } else if (endpointUrl.includes("127.0.0.1")) {
+        endpointsToTry.push(endpointUrl.replace("127.0.0.1", "localhost"));
     }
+
+    for (const ep of endpointsToTry) {
+        const url = `${ep.replace(/\/$/, "")}/api/tags`;
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+        try {
+            const res = await fetch(url, { method: "GET", signal: controller.signal });
+            clearTimeout(timer);
+            if (res.ok) {
+                return true;
+            }
+        } catch {
+            clearTimeout(timer);
+        }
+    }
+    return false;
 }
